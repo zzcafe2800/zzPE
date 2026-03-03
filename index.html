@@ -1116,22 +1116,7 @@
   const userDocRef = (u)=>doc(db, usersCol, u);
   const participantDocRef = (sid,u)=>doc(db, sessionsCol, sid, participantsSub, u);
 
-  async function ensureSessionDocs(){
-    const all = [CONFIG.sessions.sat, CONFIG.sessions.sun];
-    for (const s of all){
-      const ref = sessionDocRef(s.id);
-      const snap = await getDoc(ref);
-      if (!snap.exists()){
-        await setDoc(ref, {
-          count: 0, capacity: s.capacity, hardMax: s.hardMax,
-          createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-        }, { merge:true });
-      }else{
-        await setDoc(ref, { capacity: s.capacity, hardMax: s.hardMax, updatedAt: serverTimestamp() }, { merge:true });
-      }
-    }
-  }
-
+  
   // keep latest counts for join button enable
   const live = {
     sat: { count:0, cap: CONFIG.sessions.sat.capacity, closed:false },
