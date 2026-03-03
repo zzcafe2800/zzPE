@@ -1801,6 +1801,37 @@
 })();
 </script>
 
-  
+  <script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const homeScreen = $("#homeScreen");
+  const bubbleCanvas = $("#bubbleCanvas");
+
+  if (!homeScreen || !bubbleCanvas) return;
+
+  // 黒ベール完了まで泡を見せない（既存仕様：home表示を起点に 11秒で黒が消える）
+  const FADE_END_MS = 11000;
+
+  function hideBubblesDuringBlack(){
+    bubbleCanvas.style.transition = "opacity 800ms ease";
+    bubbleCanvas.style.opacity = "0";
+    bubbleCanvas.style.pointerEvents = "none";
+
+    // 黒が消えた後にふわっと出す（不要ならこの2行を消してもOK）
+    setTimeout(() => {
+      bubbleCanvas.style.opacity = "1";
+    }, FADE_END_MS);
+  }
+
+  // homeが表示された瞬間に適用
+  const mo = new MutationObserver(() => {
+    if (!homeScreen.classList.contains("hidden")) hideBubblesDuringBlack();
+  });
+  mo.observe(homeScreen, { attributes: true, attributeFilter: ["class"] });
+
+  // すでにhome表示中でも適用
+  if (!homeScreen.classList.contains("hidden")) hideBubblesDuringBlack();
+})();
+</script>
 </body>
 </html>
