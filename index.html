@@ -7,331 +7,216 @@
   <title>第３回フォトイベント『青空編』</title>
 
   <style>
-    /* =========================================================
-      第３回フォトイベント『青空編』 - single index.html
-      - Firebase 匿名認証 + Firestore で「端末単位」の参加登録
-      - 土曜/日曜 2日程 / 各上限10（内部最大16）
-      - 人数表示はレンジ(1-3/4-6/7-9/10+)の目安表示
-      - ロード演出（tap→preload→progress→home）
-      - ホーム：水中泡タイトルアニメ + mad.mp4背景フェードイン + 音量バー
-      - 詳細：画像カルーセル（URL配列を増やすだけで追加可能）
-      - 参加：日程選択→参加完了/待機（キャンセル可能）
-      - 後日「当日進行ページ」を追加しても参加人数ロジックが壊れない設計
-    ========================================================= */
-
     :root{
-      --bg:#000;
       --sky:#7fd3ff;
       --sky2:#bfeaff;
-      --ink:#0c1116;
       --txt:#f7fbff;
       --muted:rgba(247,251,255,.72);
       --muted2:rgba(247,251,255,.52);
-      --card:rgba(10,20,28,.58);
-      --line:rgba(255,255,255,.10);
-      --shadow: 0 16px 48px rgba(0,0,0,.38);
-      --r:18px;
-      --r2:24px;
-      --pad:16px;
-      --pad2:22px;
-      --btnH:56px;
-      --maxW:980px;
+      --shadowText: 0 10px 28px rgba(0,0,0,.60), 0 0 18px rgba(127,211,255,.18);
+      --safeTop: env(safe-area-inset-top, 0px);
+      --safeBot: env(safe-area-inset-bottom, 0px);
       --serif: "Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP","MS Mincho",serif;
       --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic","Meiryo",sans-serif;
       --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
-      --safeTop: env(safe-area-inset-top, 0px);
-      --safeBot: env(safe-area-inset-bottom, 0px);
     }
 
     *{box-sizing:border-box}
-    html,body{height:100%;margin:0;background:#000;color:var(--txt);font-family:var(--sans)}
-    a{color:inherit}
+    html,body{height:100%;margin:0;background:#000;color:var(--txt);font-family:var(--sans);overflow:hidden}
     button{font-family:inherit}
-    .no-select{user-select:none;-webkit-user-select:none}
     .hidden{display:none !important}
-    .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+    .no-select{user-select:none;-webkit-user-select:none}
 
-    /* ====== App Root ====== */
-    #app{
-      min-height:100%;
-      background: radial-gradient(1200px 900px at 50% 10%, rgba(127,211,255,.12), transparent 65%),
-                  radial-gradient(900px 700px at 80% 60%, rgba(191,234,255,.10), transparent 60%),
-                  #000;
-      overflow:hidden;
-      position:relative;
-    }
+    /* ===== App root ===== */
+    #app{position:relative;min-height:100%;}
 
-    /* ====== Background Video (mad.mp4) ====== */
-    .bgVideo{
+    /* ===== Background video ===== */
+    #bgVideo{
       position:fixed; inset:0;
       width:100%; height:100%;
       object-fit:cover;
+      z-index:0;
+      opacity:1;
+      pointer-events:none;
       filter: contrast(1.05) saturate(1.08) brightness(.95);
       transform: translateZ(0);
-      z-index:0;
-      opacity:0;
-      transition: opacity 1200ms ease;
-      pointer-events:none;
     }
-    .bgVideo.on{ opacity:1; }
 
-    /* Black veil fading out */
-    .veil{
+    /* ===== Black veil: 6s solid black, then 5s fade out ===== */
+    #veil{
       position:fixed; inset:0;
       background:#000;
       z-index:1;
       opacity:1;
       pointer-events:none;
-      transition: opacity 1500ms ease;
+      transition: opacity 5000ms ease;
     }
-    .veil.fade{ opacity:0; }
+    #veil.fade{ opacity:0; }
 
-    /* ====== Top Bar ====== */
-    .topbar{
+    /* ===== Frost overlay (Home以外は “青+ぼかし” ) ===== */
+    #frost{
+      position:fixed; inset:0;
+      z-index:2;
+      pointer-events:none;
+      opacity:0;
+      transition: opacity 220ms ease;
+      background: rgba(127,211,255,.12);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+    #app.frost-on #frost{ opacity:1; }
+
+    /* ===== Top controls (direct overlay, not card) ===== */
+    #topControls{
       position:fixed;
       left:0; right:0;
       top:0;
-      z-index:50;
+      z-index:60;
       padding: calc(10px + var(--safeTop)) 14px 10px;
       display:flex;
       align-items:center;
       justify-content:space-between;
       gap:12px;
-      pointer-events:none; /* only child controls enable */
+      pointer-events:none;
     }
-    .topbar .volWrap{
+    .volWrap{
       pointer-events:auto;
       display:flex;
       align-items:center;
       gap:10px;
-      padding:10px 12px;
-      border:1px solid rgba(255,255,255,.10);
-      background: rgba(8,16,24,.38);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      border-radius:999px;
-      box-shadow: 0 10px 22px rgba(0,0,0,.24);
     }
     .volIcon{
-      width:18px;height:18px; opacity:.88; flex:0 0 auto;
-      filter: drop-shadow(0 4px 10px rgba(0,0,0,.25));
+      width:18px;height:18px; opacity:.92;
+      filter: drop-shadow(0 8px 18px rgba(0,0,0,.35));
     }
     input[type="range"]{
-      -webkit-appearance:none;
-      appearance:none;
+      -webkit-appearance:none; appearance:none;
       width:160px;
       height:6px;
       border-radius:999px;
-      background: linear-gradient(90deg, rgba(127,211,255,.95), rgba(191,234,255,.9));
       outline:none;
-      opacity:.90;
+      background: linear-gradient(90deg, rgba(127,211,255,.95), rgba(191,234,255,.92));
+      opacity:.95;
     }
     input[type="range"]::-webkit-slider-thumb{
-      -webkit-appearance:none;
-      appearance:none;
-      width:18px;height:18px;
-      border-radius:50%;
+      -webkit-appearance:none; appearance:none;
+      width:18px;height:18px;border-radius:50%;
       background: rgba(247,251,255,.92);
       border:1px solid rgba(255,255,255,.22);
-      box-shadow: 0 10px 18px rgba(0,0,0,.35);
+      box-shadow: 0 12px 20px rgba(0,0,0,.45);
       cursor:pointer;
     }
-    .statusPill{
+    #statusText{
       pointer-events:none;
-      padding:10px 12px;
-      border-radius:999px;
-      background: rgba(8,16,24,.30);
-      border:1px solid rgba(255,255,255,.10);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-      color: rgba(247,251,255,.85);
       font-size:12px;
-      letter-spacing:.02em;
-    }
-
-    /* ====== Screens ====== */
-    .screen{
-      position:relative;
-      z-index:10;
-      min-height:100vh;
-      padding: calc(76px + var(--safeTop)) 16px calc(24px + var(--safeBot));
-      display:flex;
-      justify-content:center;
-    }
-    .wrap{
-      width:min(var(--maxW), 100%);
-    }
-
-    /* ====== Loader Screen ====== */
-    #loaderScreen{
-      background: linear-gradient(180deg, rgba(127,211,255,.35), rgba(127,211,255,.10) 55%, rgba(0,0,0,.90));
-      position:fixed; inset:0;
-      z-index:200;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding: 22px 16px;
-    }
-    .loaderCard{
-      width:min(520px, 100%);
-      border-radius: var(--r2);
-      background: rgba(255,255,255,.10);
-      border:1px solid rgba(255,255,255,.16);
-      box-shadow: var(--shadow);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      padding: 22px 20px 18px;
-      text-align:center;
-    }
-    .tapHint{
-      font-size:13px;
-      color: rgba(247,251,255,.88);
-      letter-spacing:.03em;
-      margin: 6px 0 14px;
-    }
-    .tapBtn{
-      width:100%;
-      height: 56px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,.22);
-      background: radial-gradient(140% 160% at 30% 20%, rgba(191,234,255,.45), rgba(127,211,255,.10) 40%, rgba(0,0,0,.25));
-      color: rgba(247,251,255,.95);
-      font-weight: 700;
-      letter-spacing:.06em;
-      cursor:pointer;
-      box-shadow: 0 16px 34px rgba(0,0,0,.35);
-      position:relative;
-      overflow:hidden;
-      transform: translateZ(0);
-    }
-    .tapBtn:active{ transform: translateY(1px); }
-    .tapBtn .shine{
-      position:absolute; inset:-40% -50%;
-      background: linear-gradient(120deg, transparent 35%, rgba(255,255,255,.22), transparent 65%);
-      transform: translateX(-30%) rotate(12deg);
-      animation: shine 2200ms ease-in-out infinite;
-      pointer-events:none;
-    }
-    @keyframes shine{
-      0%{ transform: translateX(-35%) rotate(12deg); opacity:.0; }
-      15%{ opacity:.9;}
-      50%{ transform: translateX(35%) rotate(12deg); opacity:.0; }
-      100%{ transform: translateX(35%) rotate(12deg); opacity:0; }
-    }
-
-    .loadingArea{
-      margin-top: 18px;
-      display:flex;
-      flex-direction:column;
-      gap:12px;
-      align-items:center;
-    }
-    .gifWrap{
-      width: 120px; height: 120px;
-      border-radius: 24px;
-      background: rgba(255,255,255,.10);
-      border:1px solid rgba(255,255,255,.14);
-      display:grid;
-      place-items:center;
-      overflow:hidden;
-      box-shadow: 0 12px 28px rgba(0,0,0,.30);
-    }
-    .gifWrap img{
-      width: 92px;
-      height: 92px;
-      image-rendering:auto;
-    }
-    .progressText{
-      font-size: 13px;
-      color: rgba(247,251,255,.86);
       letter-spacing:.05em;
+      color: rgba(247,251,255,.88);
+      text-shadow: var(--shadowText);
+      white-space:nowrap;
     }
-    .progressBar{
-      width:min(440px, 100%);
-      height: 10px;
-      border-radius: 999px;
-      border:1px solid rgba(255,255,255,.16);
-      background: rgba(0,0,0,.20);
+
+    /* ===== Credits (avoid overlap) ===== */
+    #creditBtn{
+      position:fixed;
+      right:14px;
+      bottom: calc(12px + var(--safeBot));
+      z-index:65;
+      font-size:12px;
+      letter-spacing:.06em;
+      color: rgba(247,251,255,.52);
+      text-shadow: var(--shadowText);
+      cursor:pointer;
+      user-select:none;
+      opacity:.85;
+    }
+    #creditBtn:hover{ opacity:1; }
+
+    /* ===== Screens base ===== */
+    .screen{
+      position:fixed; inset:0;
+      z-index:10;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding: calc(52px + var(--safeTop)) 16px calc(22px + var(--safeBot));
+      overflow:auto;
+    }
+
+    /* ===== Loader: 水色背景に直接載せる ===== */
+    #loaderScreen{
+      background: linear-gradient(180deg, rgba(127,211,255,1), rgba(127,211,255,.92));
+      z-index:200;
+      flex-direction:column;
+      gap:14px;
+      text-align:center;
+      padding-top: calc(64px + var(--safeTop));
+    }
+    #loadGif{
+      width: 120px;
+      height: 120px;
+      object-fit:contain;
+      display:block;
+      margin: 0 auto;
+      image-rendering:auto;
+      filter: drop-shadow(0 18px 26px rgba(0,0,0,.25));
+    }
+    #loadingText{
+      font-size: 14px;
+      letter-spacing:.05em;
+      color: rgba(10,18,26,.78);
+      font-weight:700;
+    }
+    #tapHint{
+      font-size: 12px;
+      letter-spacing:.10em;
+      color: rgba(10,18,26,.55);
+      font-weight:800;
+    }
+    .barOuter{
+      width: 240px;
+      height: 16px;
+      border-radius: 6px;
+      background: rgba(0,0,0,.12);
       overflow:hidden;
-      box-shadow: 0 10px 18px rgba(0,0,0,.22);
+      box-shadow: 0 10px 18px rgba(0,0,0,.12) inset;
     }
-    .progressFill{
-      height:100%;
+    .barFill{
       width:0%;
-      background: linear-gradient(90deg, rgba(127,211,255,.95), rgba(191,234,255,.95));
-      border-radius: 999px;
+      height:100%;
+      background: rgba(255,255,255,.85);
       transition: width 220ms ease;
     }
 
-    /* ====== Home ====== */
-    .homeHero{
-      position:relative;
-      border-radius: var(--r2);
-      padding: 26px 18px 18px;
-      background: radial-gradient(1200px 700px at 50% -10%, rgba(127,211,255,.14), transparent 55%),
-                  radial-gradient(900px 600px at 20% 70%, rgba(191,234,255,.10), transparent 65%),
-                  rgba(10,18,26,.52);
-      border: 1px solid rgba(255,255,255,.12);
-      box-shadow: var(--shadow);
-      overflow:hidden;
-    }
-    .homeHero::after{
-      content:"";
-      position:absolute; inset:0;
-      background: linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.30) 40%, rgba(0,0,0,.58));
-      pointer-events:none;
-      opacity:.40;
-    }
-
-    /* Water bubble canvas behind title */
-    #bubbleCanvas{
-      position:absolute; inset:0;
-      width:100%; height:100%;
-      z-index:0;
-      opacity:.85;
-      filter: drop-shadow(0 10px 24px rgba(0,0,0,.35));
-    }
-
-    .titleArea{
-      position:relative;
-      z-index:2;
+    /* ===== Home (超シンプル) ===== */
+    #homeScreen{ z-index:20; }
+    .homeWrap{
+      width:min(980px, 100%);
       display:flex;
       flex-direction:column;
       align-items:center;
+      justify-content:center;
       text-align:center;
-      gap:10px;
-      padding: 18px 10px 8px;
+      gap: 12px;
     }
-
-    .eventTitle{
+    #homeTitle{
       font-family: var(--serif);
       font-weight: 600;
-      letter-spacing: .06em;
-      line-height:1.18;
-      font-size: clamp(26px, 3.8vw, 44px);
-      margin:0;
-      position:relative;
-      text-shadow: 0 10px 28px rgba(0,0,0,.55);
+      letter-spacing:.06em;
+      line-height:1.15;
+      font-size: clamp(30px, 4.6vw, 54px);
+      margin: 0;
+      text-shadow: var(--shadowText);
+    }
+    #homeSub{
+      margin: 0;
+      font-size: 13px;
+      letter-spacing:.04em;
+      color: rgba(247,251,255,.86);
+      text-shadow: var(--shadowText);
     }
 
-    /* subtle chromatic offset / glow layers */
-    .eventTitle::before,
-    .eventTitle::after{
-      content: attr(data-text);
-      position:absolute;
-      left:0; top:0;
-      width:100%;
-      color: rgba(127,211,255,.18);
-      filter: blur(.2px);
-      pointer-events:none;
-    }
-    .eventTitle::before{ transform: translate(-1px, 1px); opacity:.70; }
-    .eventTitle::after{ transform: translate(1px, -1px); opacity:.55; color: rgba(191,234,255,.14); }
-
-    .titleLetters{
-      display:inline-block;
-      white-space:pre-wrap;
-    }
+    /* Title bubble float-in (keep, no extra UI) */
+    .titleLetters{display:inline-block; white-space:pre-wrap}
     .letter{
       display:inline-block;
       opacity:0;
@@ -340,309 +225,155 @@
       will-change: transform, opacity, filter;
       position:relative;
       color: rgba(247,251,255,.96);
-      text-shadow:
-        0 18px 44px rgba(0,0,0,.55),
-        0 0 18px rgba(127,211,255,.22);
+      text-shadow: var(--shadowText);
     }
-    /* Per-letter float-in animation */
     @keyframes floatIn{
-      0%{
-        opacity:0;
-        filter: blur(18px);
-        transform: translate3d(calc(var(--sx, 0px) * 1.0), 70px, 0) rotate(var(--rot, 0deg));
-      }
-      55%{
-        opacity:1;
-        filter: blur(6px);
-        transform: translate3d(calc(var(--sx, 0px) * .6), 12px, 0) rotate(calc(var(--rot, 0deg) * .35));
-      }
-      85%{
-        filter: blur(1.6px);
-        transform: translate3d(calc(var(--sx, 0px) * .25), -2px, 0) rotate(calc(var(--rot, 0deg) * .12));
-      }
-      100%{
-        opacity:1;
-        filter: blur(0px);
-        transform: translate3d(0px, 0px, 0) rotate(0deg);
-      }
+      0%{opacity:0;filter:blur(18px);transform:translate3d(calc(var(--sx,0px)*1.0),70px,0) rotate(var(--rot,0deg));}
+      55%{opacity:1;filter:blur(6px);transform:translate3d(calc(var(--sx,0px)*.6),12px,0) rotate(calc(var(--rot,0deg)*.35));}
+      85%{filter:blur(1.6px);transform:translate3d(calc(var(--sx,0px)*.25),-2px,0) rotate(calc(var(--rot,0deg)*.12));}
+      100%{opacity:1;filter:blur(0px);transform:translate3d(0,0,0) rotate(0deg);}
     }
-    /* After arrival, very subtle breathing shimmer (NOT disappearing) */
     @keyframes shimmerHold{
-      0%,100%{ text-shadow: 0 18px 44px rgba(0,0,0,.55), 0 0 18px rgba(127,211,255,.22); }
-      50%{ text-shadow: 0 18px 44px rgba(0,0,0,.55), 0 0 26px rgba(127,211,255,.26); }
+      0%,100%{ text-shadow: var(--shadowText); }
+      50%{ text-shadow: 0 10px 28px rgba(0,0,0,.60), 0 0 26px rgba(127,211,255,.26); }
     }
-    .letter.hold{
-      animation: shimmerHold 5200ms ease-in-out infinite;
+    .letter.hold{ animation: shimmerHold 5200ms ease-in-out infinite; }
+
+    /* Bubble canvas behind title only */
+    #bubbleCanvas{
+      position:fixed;
+      inset:0;
+      z-index:19;
+      pointer-events:none;
+      opacity:.75;
+      filter: drop-shadow(0 12px 26px rgba(0,0,0,.35));
     }
 
-    .subInfo{
-      font-size: 13px;
-      color: rgba(247,251,255,.82);
-      letter-spacing:.04em;
-      margin-top: 2px;
-    }
-    .subInfo small{ color: rgba(247,251,255,.68); display:block; margin-top:6px; }
-
-    .btnRow{
-      position:relative;
-      z-index:2;
-      margin-top: 16px;
-      display:grid;
-      grid-template-columns: 1fr;
-      gap: 12px;
-      padding: 0 6px 6px;
-    }
-    @media (min-width: 720px){
-      .btnRow{ grid-template-columns: 1fr 1fr; }
-    }
-
-    /* ====== Fancy Buttons ====== */
-    .fancyBtn{
-      height: var(--btnH);
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,.18);
-      background:
-        radial-gradient(120% 170% at 20% 15%, rgba(191,234,255,.40), rgba(127,211,255,.12) 38%, rgba(0,0,0,.18)),
-        rgba(10,18,26,.35);
-      color: rgba(247,251,255,.96);
-      font-weight: 750;
-      letter-spacing: .08em;
-      cursor:pointer;
-      position:relative;
-      overflow:hidden;
-      box-shadow: 0 18px 38px rgba(0,0,0,.30);
-      transition: transform 180ms ease, filter 180ms ease, border-color 180ms ease;
-      transform: translateZ(0);
-    }
-    .fancyBtn:hover{
-      border-color: rgba(191,234,255,.38);
-      filter: brightness(1.06);
-      transform: translateY(-1px);
-    }
-    .fancyBtn:active{ transform: translateY(1px) scale(.995); }
-    .fancyBtn .label{
-      position:relative;
-      z-index:2;
+    /* Home buttons (only 2, minimal) */
+    .homeBtns{
+      margin-top: 10px;
       display:flex;
       align-items:center;
       justify-content:center;
-      gap:10px;
-    }
-    .fancyBtn .mini{
-      font-size: 12px;
-      letter-spacing: .06em;
-      color: rgba(247,251,255,.74);
-      font-weight:650;
-    }
-    .fancyBtn .burst{
-      position:absolute;
-      inset:0;
-      pointer-events:none;
-      opacity:0;
-      background: radial-gradient(220px 220px at var(--x, 50%) var(--y, 50%),
-        rgba(255,255,255,.36), rgba(127,211,255,.18) 35%, transparent 70%);
-      transform: scale(.8);
-    }
-    .fancyBtn.boom .burst{
-      opacity:1;
-      animation: burst 520ms ease-out forwards;
-    }
-    @keyframes burst{
-      0%{ transform: scale(.55); opacity:.85; }
-      60%{ transform: scale(1.05); opacity:.55;}
-      100%{ transform: scale(1.35); opacity:0; }
-    }
-
-    /* “Pop away” when switching screens */
-    @keyframes popAway{
-      0%{ transform: translateY(0) scale(1); opacity:1; }
-      70%{ transform: translateY(-8px) scale(1.02); opacity:1; }
-      100%{ transform: translateY(-18px) scale(.96); opacity:0; }
-    }
-    .popAway{ animation: popAway 420ms ease forwards; }
-
-    /* ====== Generic Card ====== */
-    .card{
-      margin-top: 16px;
-      background: rgba(10,18,26,.56);
-      border:1px solid rgba(255,255,255,.12);
-      border-radius: var(--r2);
-      box-shadow: var(--shadow);
-      padding: 16px;
-      overflow:hidden;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-    .card h2{
-      margin: 0 0 8px;
-      font-family: var(--serif);
-      font-size: 18px;
-      letter-spacing:.05em;
-    }
-    .card p{
-      margin: 8px 0;
-      color: rgba(247,251,255,.82);
-      line-height:1.65;
-      font-size: 14px;
-    }
-    .muted{ color: rgba(247,251,255,.70); }
-    .tiny{ font-size:12px; color: rgba(247,251,255,.62); }
-
-    /* ====== Schedule Cards ====== */
-    .schedGrid{
-      display:grid;
-      grid-template-columns: 1fr;
-      gap: 12px;
-      margin-top: 12px;
-    }
-    @media (min-width: 720px){
-      .schedGrid{ grid-template-columns: 1fr 1fr; }
-    }
-    .sched{
-      border-radius: var(--r2);
-      padding: 16px;
-      border:1px solid rgba(255,255,255,.12);
-      background: radial-gradient(120% 150% at 30% 10%, rgba(127,211,255,.18), transparent 45%),
-                  rgba(10,18,26,.52);
-      position:relative;
-      overflow:hidden;
-      box-shadow: 0 18px 40px rgba(0,0,0,.28);
-    }
-    .sched .top{
-      display:flex;
-      align-items:flex-start;
-      justify-content:space-between;
-      gap:10px;
-    }
-    .sched .name{
-      font-family: var(--serif);
-      font-size: 18px;
-      letter-spacing:.06em;
-      margin:0;
-    }
-    .badge{
-      border-radius:999px;
-      padding: 8px 10px;
-      border:1px solid rgba(255,255,255,.14);
-      background: rgba(0,0,0,.22);
-      color: rgba(247,251,255,.88);
-      font-size: 12px;
-      letter-spacing:.05em;
-      white-space:nowrap;
-    }
-    .sched .meta{
-      margin-top: 8px;
-      color: rgba(247,251,255,.76);
-      font-size: 13px;
-      letter-spacing:.02em;
-    }
-    .sched .action{
-      margin-top: 12px;
-      display:flex;
-      gap: 10px;
-      align-items:center;
+      gap: 18px;
       flex-wrap:wrap;
     }
-    .miniBtn{
-      height: 44px;
+    #homeJoinBtn{
+      height:54px;
+      min-width: 220px;
+      padding: 0 22px;
       border-radius: 999px;
-      padding: 0 16px;
-      border:1px solid rgba(255,255,255,.16);
-      background: rgba(0,0,0,.22);
-      color: rgba(247,251,255,.92);
+      border: 1px solid rgba(255,255,255,.22);
+      background: rgba(0,0,0,.28);
+      color: rgba(247,251,255,.96);
+      font-weight: 850;
+      letter-spacing:.10em;
       cursor:pointer;
-      font-weight:750;
-      letter-spacing:.06em;
-      transition: transform 160ms ease, filter 160ms ease, border-color 160ms ease;
-      position:relative;
-      overflow:hidden;
+      text-shadow: var(--shadowText);
+      box-shadow: 0 18px 40px rgba(0,0,0,.35);
     }
-    .miniBtn:hover{
-      filter: brightness(1.08);
-      border-color: rgba(191,234,255,.32);
-      transform: translateY(-1px);
-    }
-    .miniBtn:active{ transform: translateY(1px); }
-    .miniBtn[disabled]{
-      opacity:.60; cursor:not-allowed; filter:saturate(.9);
-    }
-    .hintLine{
-      margin-top: 10px;
-      font-size: 12px;
-      color: rgba(247,251,255,.70);
-      line-height:1.55;
-    }
+    #homeJoinBtn:hover{ filter: brightness(1.08); }
+    #homeJoinBtn:active{ transform: translateY(1px); }
+    #homeJoinBtn[disabled]{ opacity:.55; cursor:not-allowed; }
 
-    /* ====== Waiting Screen ====== */
-    .bigOk{
-      font-family: var(--serif);
-      font-size: 22px;
-      letter-spacing:.05em;
-      margin: 2px 0 10px;
+    #homeDetailsBtn{
+      border: none;
+      background: transparent;
+      color: rgba(247,251,255,.92);
+      font-weight: 800;
+      letter-spacing:.10em;
+      cursor:pointer;
+      text-shadow: var(--shadowText);
+      padding: 10px 8px;
+      text-decoration: underline;
+      text-underline-offset: 6px;
+      opacity:.92;
     }
-    .pill{
-      display:inline-flex;
+    #homeDetailsBtn:hover{ opacity:1; }
+    #homeDetailsBtn:active{ transform: translateY(1px); }
+
+    /* ===== Simple header row (no card) ===== */
+    .simpleTopRow{
+      width:min(920px, 100%);
+      display:flex;
       align-items:center;
-      gap:8px;
-      padding: 10px 12px;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom: 12px;
+    }
+    .simpleTitle{
+      margin:0;
+      font-family: var(--serif);
+      letter-spacing:.06em;
+      font-size: 20px;
+      text-shadow: var(--shadowText);
+    }
+    .backBtn{
+      height: 44px;
+      padding: 0 16px;
       border-radius: 999px;
-      border:1px solid rgba(255,255,255,.14);
-      background: rgba(0,0,0,.22);
-      color: rgba(247,251,255,.88);
-      font-size: 12px;
-      letter-spacing:.04em;
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(0,0,0,.26);
+      color: rgba(247,251,255,.95);
+      font-weight: 800;
+      letter-spacing:.08em;
+      cursor:pointer;
+      text-shadow: var(--shadowText);
     }
+    .backBtn:hover{ filter: brightness(1.08); }
+    .backBtn:active{ transform: translateY(1px); }
 
-    /* ====== Details Carousel ====== */
-    .carousel{
-      margin-top: 12px;
-      border-radius: var(--r2);
-      overflow:hidden;
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(0,0,0,.20);
-      position:relative;
-      box-shadow: 0 18px 42px rgba(0,0,0,.28);
+    /* ===== Details: only image + dots + <> + title/back ===== */
+    .detailsWrap{
+      width:min(920px, 100%);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
     }
-    .carouselViewport{
+    .carousel{
+      width:100%;
+      border-radius: 18px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(127,211,255,.10);
+      box-shadow: 0 18px 44px rgba(0,0,0,.32);
+      position:relative;
+    }
+    .viewport{
       width:100%;
       aspect-ratio: 16/10;
-      max-height: 62vh;
-      background: linear-gradient(180deg, rgba(127,211,255,.10), rgba(0,0,0,.15));
+      max-height: 68vh;
       display:flex;
       align-items:center;
       justify-content:center;
-      position:relative;
+      background: rgba(127,211,255,.12);
     }
-    .carouselViewport img{
-      width:100%;
-      height:100%;
+    .viewport img{
+      width:100%; height:100%;
       object-fit: contain;
       background: rgba(127,211,255,.10);
     }
-    .carNav{
+    .navBtn{
       position:absolute;
-      top: 50%;
+      top:50%;
       transform: translateY(-50%);
-      width: 44px; height: 44px;
-      border-radius: 999px;
+      width: 44px; height:44px;
+      border-radius:999px;
       border:1px solid rgba(255,255,255,.18);
       background: rgba(0,0,0,.30);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
       color: rgba(247,251,255,.95);
       cursor:pointer;
-      display:grid;
-      place-items:center;
-      box-shadow: 0 14px 26px rgba(0,0,0,.30);
+      box-shadow: 0 14px 26px rgba(0,0,0,.34);
     }
-    .carNav:hover{ filter: brightness(1.08); }
-    .carNav:active{ transform: translateY(-50%) scale(.98); }
-    .carNav.left{ left: 12px; }
-    .carNav.right{ right: 12px; }
+    .navBtn:hover{ filter: brightness(1.08); }
+    .navBtn:active{ transform: translateY(-50%) scale(.98); }
+    .navBtn.left{ left: 12px; }
+    .navBtn.right{ right: 12px; }
 
     .dots{
       position:absolute;
-      left: 50%;
+      left:50%;
       bottom: 12px;
       transform: translateX(-50%);
       display:flex;
@@ -656,103 +387,159 @@
     }
     .dot{
       width:8px;height:8px;border-radius:50%;
-      background: rgba(247,251,255,.36);
-      border:1px solid rgba(255,255,255,.10);
+      background: rgba(247,251,255,.38);
+      border:1px solid rgba(255,255,255,.12);
       cursor:pointer;
       transition: transform 160ms ease, background 160ms ease;
     }
-    .dot.on{ background: rgba(191,234,255,.85); transform: scale(1.18); }
+    .dot.on{ background: rgba(191,234,255,.88); transform: scale(1.18); }
 
-    /* ====== Header row w/back ====== */
-    .headRow{
+    /* ===== Join: center content, minimal rows + fixed bottom-right join button ===== */
+    .joinWrap{
+      width:min(920px, 100%);
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      gap: 10px;
+      position:relative;
+      padding-bottom: 84px; /* room for fixed button */
+    }
+    .sessionList{
+      width:100%;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .sessionRow{
+      width:100%;
+      border:1px solid rgba(255,255,255,.14);
+      border-radius: 18px;
+      background: rgba(0,0,0,.22);
+      padding: 14px 16px;
       display:flex;
       align-items:center;
       justify-content:space-between;
-      gap:12px;
-    }
-    .backBtn{
-      height: 44px;
-      border-radius: 999px;
-      padding: 0 16px;
-      border:1px solid rgba(255,255,255,.16);
-      background: rgba(0,0,0,.22);
-      color: rgba(247,251,255,.92);
+      gap: 12px;
       cursor:pointer;
-      font-weight:750;
-      letter-spacing:.06em;
-      transition: transform 160ms ease, filter 160ms ease, border-color 160ms ease;
+      box-shadow: 0 16px 36px rgba(0,0,0,.26);
     }
-    .backBtn:hover{
-      filter: brightness(1.08);
-      border-color: rgba(191,234,255,.28);
-      transform: translateY(-1px);
+    .sessionRow:hover{ filter: brightness(1.06); }
+    .sessionRow.on{
+      border-color: rgba(191,234,255,.35);
+      background: rgba(127,211,255,.16);
     }
-    .backBtn:active{ transform: translateY(1px); }
-
-    /* ====== Credits overlay ====== */
-    .creditBtn{
-      position:absolute;
-      right: 14px;
-      top: 12px;
-      z-index:5;
-      color: rgba(247,251,255,.38);
-      font-size: 12px;
-      letter-spacing:.06em;
-      cursor:pointer;
-      user-select:none;
-      transition: color 160ms ease;
+    .sessionMain{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
     }
-    .creditBtn:hover{ color: rgba(247,251,255,.70); }
-    .modal{
-      position:fixed; inset:0;
-      z-index:300;
-      display:none;
-      align-items:center;
-      justify-content:center;
-      padding: 16px;
-      background: rgba(0,0,0,.55);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-    }
-    .modal.on{ display:flex; }
-    .modalCard{
-      width:min(560px, 100%);
-      border-radius: var(--r2);
-      border:1px solid rgba(255,255,255,.14);
-      background: rgba(10,18,26,.72);
-      box-shadow: 0 22px 60px rgba(0,0,0,.46);
-      padding: 16px;
-    }
-    .modalCard h3{
-      margin: 0 0 8px;
+    .sessionName{
+      margin:0;
       font-family: var(--serif);
       letter-spacing:.06em;
+      font-size: 18px;
+      text-shadow: var(--shadowText);
     }
-    .modalCard pre{
-      margin: 10px 0 0;
-      padding: 12px;
-      border-radius: 14px;
-      background: rgba(0,0,0,.24);
-      border:1px solid rgba(255,255,255,.10);
+    .sessionNow{
+      font-size: 13px;
+      letter-spacing:.05em;
       color: rgba(247,251,255,.86);
-      font-family: var(--mono);
-      font-size: 12px;
-      line-height:1.55;
-      white-space:pre-wrap;
-      word-break:break-word;
+      text-shadow: var(--shadowText);
     }
-    .modalActions{
-      display:flex;
-      justify-content:flex-end;
-      gap:10px;
-      margin-top: 12px;
+    .sessionNote{
+      font-size:12px;
+      letter-spacing:.04em;
+      color: rgba(247,251,255,.78);
+      text-shadow: var(--shadowText);
+      margin-top: 6px;
     }
 
-    /* ====== Small toast ====== */
-    .toast{
+    #joinConfirmBtn{
       position:fixed;
-      left: 50%;
-      bottom: calc(18px + var(--safeBot));
+      right: 14px;
+      bottom: calc(14px + var(--safeBot));
+      z-index:80;
+      height: 54px;
+      padding: 0 22px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.20);
+      background: rgba(0,0,0,.34);
+      color: rgba(247,251,255,.96);
+      font-weight: 900;
+      letter-spacing:.10em;
+      cursor:pointer;
+      box-shadow: 0 20px 46px rgba(0,0,0,.40);
+      text-shadow: var(--shadowText);
+    }
+    #joinConfirmBtn:hover{ filter: brightness(1.08); }
+    #joinConfirmBtn:active{ transform: translateY(1px); }
+    #joinConfirmBtn[disabled]{ opacity:.55; cursor:not-allowed; }
+
+    /* ===== Wait: card only (center), big headline, then "土曜/21:00〜" line, then description, bottom-right cancel ===== */
+    .waitWrap{
+      width:min(680px, 100%);
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+    .waitCard{
+      width:100%;
+      border-radius: 22px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.28);
+      box-shadow: 0 24px 64px rgba(0,0,0,.40);
+      padding: 18px 18px 70px;
+      position:relative;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    #waitHeadline{
+      margin: 2px 0 8px;
+      font-family: var(--serif);
+      font-size: 22px;
+      letter-spacing:.06em;
+      text-shadow: var(--shadowText);
+    }
+    #waitWhen{
+      margin: 0 0 14px;
+      font-size: 14px;
+      letter-spacing:.05em;
+      color: rgba(247,251,255,.90);
+      text-shadow: var(--shadowText);
+    }
+    #waitDesc{
+      margin:0;
+      font-size: 15px;
+      line-height:1.7;
+      letter-spacing:.03em;
+      color: rgba(247,251,255,.92);
+      text-shadow: var(--shadowText);
+    }
+    #leaveBtn{
+      position:absolute;
+      right: 14px;
+      bottom: 14px;
+      height: 48px;
+      padding: 0 18px;
+      border-radius: 999px;
+      border:1px solid rgba(255,255,255,.18);
+      background: rgba(0,0,0,.30);
+      color: rgba(247,251,255,.95);
+      font-weight: 900;
+      letter-spacing:.10em;
+      cursor:pointer;
+      box-shadow: 0 16px 36px rgba(0,0,0,.35);
+      text-shadow: var(--shadowText);
+    }
+    #leaveBtn:hover{ filter: brightness(1.08); }
+    #leaveBtn:active{ transform: translateY(1px); }
+
+    /* ===== Toast ===== */
+    #toast{
+      position:fixed;
+      left:50%;
+      bottom: calc(78px + var(--safeBot));
       transform: translateX(-50%);
       z-index:500;
       padding: 12px 14px;
@@ -768,22 +555,63 @@
       opacity:0;
       pointer-events:none;
       transition: opacity 180ms ease, transform 180ms ease;
+      text-shadow: var(--shadowText);
+      white-space:nowrap;
     }
-    .toast.on{
-      opacity:1;
-      transform: translateX(-50%) translateY(-4px);
+    #toast.on{ opacity:1; transform: translateX(-50%) translateY(-4px); }
+
+    /* ===== Credits modal ===== */
+    #creditModal{
+      position:fixed; inset:0;
+      z-index:300;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      padding: 16px;
+      background: rgba(0,0,0,.55);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
     }
+    #creditModal.on{ display:flex; }
+    .modalCard{
+      width:min(560px, 100%);
+      border-radius: 22px;
+      border:1px solid rgba(255,255,255,.14);
+      background: rgba(0,0,0,.40);
+      box-shadow: 0 22px 60px rgba(0,0,0,.46);
+      padding: 16px;
+    }
+    .modalCard h3{
+      margin: 0 0 8px;
+      font-family: var(--serif);
+      letter-spacing:.06em;
+      text-shadow: var(--shadowText);
+    }
+    .modalCard pre{
+      margin: 10px 0 0;
+      padding: 12px;
+      border-radius: 14px;
+      background: rgba(0,0,0,.30);
+      border:1px solid rgba(255,255,255,.10);
+      color: rgba(247,251,255,.86);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height:1.55;
+      white-space:pre-wrap;
+      word-break:break-word;
+    }
+    .modalActions{ display:flex; justify-content:flex-end; margin-top: 12px; }
   </style>
 </head>
 
 <body>
 <div id="app" class="no-select">
-  <!-- Background (mad.mp4) -->
-  <video id="bgVideo" class="bgVideo" playsinline muted loop preload="auto"></video>
-  <div id="veil" class="veil"></div>
+  <video id="bgVideo" playsinline muted loop preload="auto"></video>
+  <div id="veil"></div>
+  <div id="frost"></div>
 
-  <!-- Topbar: volume + status -->
-  <div class="topbar">
+  <!-- Top controls (homeでも表示) -->
+  <div id="topControls">
     <div class="volWrap" title="サイト内の音量（BGM/効果音）">
       <svg class="volIcon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
         <path d="M4 10v4c0 .55.45 1 1 1h3l4 3c.66.5 1.6.03 1.6-.8V6.8c0-.83-.94-1.3-1.6-.8l-4 3H5c-.55 0-1 .45-1 1Z" stroke="rgba(247,251,255,.92)" stroke-width="1.6" stroke-linejoin="round"/>
@@ -792,301 +620,175 @@
       </svg>
       <input id="volSlider" type="range" min="0" max="100" value="50" />
     </div>
-
-    <div id="statusPill" class="statusPill">接続：準備中</div>
+    <div id="statusText">接続：準備中</div>
   </div>
 
-  <!-- Loader Screen -->
-  <section id="loaderScreen">
-    <div class="loaderCard">
-      <div style="font-family:var(--serif);font-size:18px;letter-spacing:.06em;margin-top:4px;">
-        第３回フォトイベント『青空編』
-      </div>
-      <div class="tapHint">タッチ / クリックで開始（音の許可 → ロード開始）</div>
+  <div id="creditBtn" class="hidden">クレジット</div>
 
-      <button id="tapToStart" class="tapBtn">
-        <span class="shine"></span>
-        はじめる
-      </button>
-
-      <div class="loadingArea">
-        <div class="gifWrap" aria-label="loading">
-          <!-- load.gif をここに置けばそのまま表示されます（同階層推奨） -->
-          <img id="loadGif" alt="loading" />
-        </div>
-        <div class="progressText" id="progressText">ロード待機中</div>
-        <div class="progressBar" aria-hidden="true">
-          <div class="progressFill" id="progressFill"></div>
-        </div>
-      </div>
-
-      <div class="tiny" style="margin-top:14px;color:rgba(247,251,255,.62);line-height:1.6;">
-        ※スマホでも落ちにくいよう、初回に画像/音/動画を軽くプリロードします。<br/>
-        ※音が出ない場合は、いちど画面をタップしてください。
-      </div>
-    </div>
+  <!-- Loader (tap anywhere) -->
+  <section id="loaderScreen" class="screen">
+    <img id="loadGif" alt="loading" />
+    <div id="loadingText">ロード中</div>
+    <div class="barOuter" aria-hidden="true"><div id="progressFill" class="barFill"></div></div>
+    <div id="tapHint">タップ</div>
   </section>
 
-  <!-- Credits Modal -->
-  <div id="creditModal" class="modal" role="dialog" aria-modal="true" aria-label="クレジット">
-    <div class="modalCard">
-      <h3>クレジット</h3>
-      <div class="tiny muted">（この文章は index.html 内の設定で変更できます）</div>
-      <pre id="creditText"></pre>
-      <div class="modalActions">
-        <button id="closeCredit" class="backBtn">閉じる</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Toast -->
-  <div id="toast" class="toast">…</div>
+  <!-- Bubble canvas (home only) -->
+  <canvas id="bubbleCanvas" class="hidden"></canvas>
 
   <!-- HOME -->
   <section id="homeScreen" class="screen hidden">
-    <div class="wrap">
-      <div class="homeHero">
-        <canvas id="bubbleCanvas"></canvas>
-        <div class="creditBtn" id="openCredit">クレジット</div>
+    <div class="homeWrap">
+      <h1 id="homeTitle">
+        <span class="titleLetters" id="titleLetters"></span>
+      </h1>
+      <p id="homeSub">土曜 / 日曜　21:00〜（約1時間）</p>
 
-        <div class="titleArea">
-          <h1 class="eventTitle" id="eventTitle" data-text="第３回フォトイベント『青空編』">
-            <span class="titleLetters" id="titleLetters"></span>
-          </h1>
-
-          <div class="subInfo">
-            土曜 / 日曜　21:00〜（約1時間）
-            <small>※各回 4〜10名ほどで開催予定です / 参加は任意・キャンセル可能</small>
-          </div>
-
-          <div class="btnRow">
-            <button id="btnDetails" class="fancyBtn">
-              <span class="burst"></span>
-              <span class="label">イベント詳細 <span class="mini">【何するの？】</span></span>
-            </button>
-
-            <button id="btnJoin" class="fancyBtn">
-              <span class="burst"></span>
-              <span class="label">参加予定 <span class="mini">（応募 / 人数目安）</span></span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <h2>いま出来ること</h2>
-        <p>
-          このページは<strong>募集〜待機</strong>までを先に完成させています。<br/>
-          後から「当日進行ページ（公開）」を追加しても、人数表示や参加状態が崩れないように設計しています。
-        </p>
-        <p class="tiny">
-          参加登録は <strong>ログインなし（匿名 / Firebase匿名認証）</strong>、端末単位です。<br/>
-          ただし匿名のため「別端末」「複数端末」での重複が発生する可能性があります（小規模イベント前提の運用）。
-        </p>
+      <div class="homeBtns">
+        <button id="homeJoinBtn">参加予定</button>
+        <button id="homeDetailsBtn">イベント詳細</button>
       </div>
     </div>
   </section>
 
   <!-- DETAILS -->
   <section id="detailsScreen" class="screen hidden">
-    <div class="wrap">
-      <div class="card">
-        <div class="headRow">
-          <h2 style="margin:0;">イベント詳細【何するの？】</h2>
-          <button class="backBtn" id="backFromDetails">戻る</button>
-        </div>
-        <p class="muted" style="margin-top:10px;">
-          画像はコード内の配列にURLを追加するだけで増やせます。<br/>
-          背景のすき間は水色系で、必ず全体が見える（contain）表示です。
-        </p>
+    <div class="detailsWrap">
+      <div class="simpleTopRow">
+        <h2 class="simpleTitle">イベント詳細</h2>
+        <button class="backBtn" id="backFromDetails">戻る</button>
+      </div>
 
-        <div class="carousel" id="carousel">
-          <div class="carouselViewport" id="carViewport">
-            <img id="carImage" alt="detail image" />
-            <button class="carNav left" id="carPrev" aria-label="前へ">‹</button>
-            <button class="carNav right" id="carNext" aria-label="次へ">›</button>
-            <div class="dots" id="carDots" aria-label="ページ"></div>
-          </div>
+      <div class="carousel" id="carousel">
+        <div class="viewport" id="carViewport">
+          <img id="carImage" alt="detail image" />
+          <button class="navBtn left" id="carPrev" aria-label="前へ">‹</button>
+          <button class="navBtn right" id="carNext" aria-label="次へ">›</button>
+          <div class="dots" id="carDots" aria-label="ページ"></div>
         </div>
-
-        <p class="tiny" style="margin-top:12px;">
-          ヒント：スマホは左右スワイプでも移動できます。
-        </p>
       </div>
     </div>
   </section>
 
-  <!-- JOIN (schedule select) -->
+  <!-- JOIN -->
   <section id="joinScreen" class="screen hidden">
-    <div class="wrap">
-      <div class="card">
-        <div class="headRow">
-          <h2 style="margin:0;">参加予定</h2>
-          <button class="backBtn" id="backFromJoin">戻る</button>
+    <div class="joinWrap">
+      <div class="simpleTopRow">
+        <h2 class="simpleTitle">参加予定</h2>
+        <button class="backBtn" id="backFromJoin">戻る</button>
+      </div>
+
+      <div class="sessionList">
+        <div class="sessionRow" id="rowSat" role="button" tabindex="0">
+          <div class="sessionMain">
+            <p class="sessionName">☀ 土曜 / 21:00</p>
+            <div class="sessionNow">現在：<span id="badgeSat">…</span></div>
+          </div>
         </div>
 
-        <p class="tiny" style="margin-top:10px;">
-          各日程カードに「人数レンジ（目安）」を表示します。<br/>
-          各回：一旦 <strong>上限10名</strong>（内部制御の最大16）。定員に達したら「受付終了」になります。キャンセルがあれば戻ります。
+        <div class="sessionRow" id="rowSun" role="button" tabindex="0">
+          <div class="sessionMain">
+            <p class="sessionName">🌊 日曜 / 21:00</p>
+            <div class="sessionNow">現在：<span id="badgeSun">…</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sessionNote">各回 4〜10名ほどで開催予定です</div>
+    </div>
+
+    <button id="joinConfirmBtn" disabled>参加予定</button>
+  </section>
+
+  <!-- WAIT -->
+  <section id="waitScreen" class="screen hidden">
+    <div class="waitWrap">
+      <div class="waitCard">
+        <div class="simpleTopRow" style="margin:0 0 8px;">
+          <h2 class="simpleTitle">待機</h2>
+          <button class="backBtn" id="backFromWait">戻る</button>
+        </div>
+
+        <div id="waitHeadline">参加予定に追加しました🌤</div>
+        <div id="waitWhen">…</div>
+
+        <p id="waitDesc">
+          当日は、参加日の時間になったら<br/>
+          このサイト と gogh を開くだけで案内が表示されます
         </p>
 
-        <div class="schedGrid">
-          <div class="sched" id="schedSat">
-            <div class="top">
-              <div>
-                <p class="name">☀ 土曜 / 21:00</p>
-                <div class="meta">同内容（青空編） / 約1時間</div>
-              </div>
-              <div class="badge" id="badgeSat">…</div>
-            </div>
-            <div class="action">
-              <button class="miniBtn" id="btnJoinSat">参加予定にする</button>
-              <span class="tiny" id="satAltHint"></span>
-            </div>
-            <div class="hintLine">各回 4〜10名ほどで開催予定です。参加は任意です。キャンセルも可能です。</div>
-          </div>
-
-          <div class="sched" id="schedSun">
-            <div class="top">
-              <div>
-                <p class="name">🌊 日曜 / 21:00</p>
-                <div class="meta">同内容（青空編） / 約1時間</div>
-              </div>
-              <div class="badge" id="badgeSun">…</div>
-            </div>
-            <div class="action">
-              <button class="miniBtn" id="btnJoinSun">参加予定にする</button>
-              <span class="tiny" id="sunAltHint"></span>
-            </div>
-            <div class="hintLine">各回 4〜10名ほどで開催予定です。参加は任意です。キャンセルも可能です。</div>
-          </div>
-        </div>
+        <button id="leaveBtn">予定を外す</button>
       </div>
     </div>
   </section>
 
-  <!-- WAITING -->
-  <section id="waitScreen" class="screen hidden">
-    <div class="wrap">
-      <div class="card">
-        <div class="headRow">
-          <h2 style="margin:0;">参加完了 / 待機</h2>
-          <button class="backBtn" id="backFromWait">ホーム</button>
-        </div>
+  <!-- Toast -->
+  <div id="toast">…</div>
 
-        <div style="margin-top:12px;">
-          <div class="bigOk">参加予定に追加しました🌤</div>
-          <div class="pill" id="mySessionPill">あなたの参加日：…</div>
-
-          <p style="margin-top:12px;">
-            当日は、参加日の時間になったら<br/>
-            <strong>このサイト</strong> と <strong>gogh</strong> を開くだけで案内が表示されます
-          </p>
-
-          <div style="margin-top:12px;display:flex;gap:10px;flex-wrap:wrap;">
-            <button class="miniBtn" id="btnLeave">予定を外す</button>
-            <button class="miniBtn" id="btnGoJoin">人数状況を見る</button>
-          </div>
-
-          <p class="tiny" style="margin-top:12px;">
-            ※端末単位のため、同一端末・同一ブラウザでは同じ参加者として扱います。
-          </p>
-        </div>
+  <!-- Credits modal -->
+  <div id="creditModal" role="dialog" aria-modal="true" aria-label="クレジット">
+    <div class="modalCard">
+      <h3>クレジット</h3>
+      <pre id="creditText"></pre>
+      <div class="modalActions">
+        <button class="backBtn" id="closeCredit">閉じる</button>
       </div>
     </div>
-  </section>
-
-</div><!-- /app -->
+  </div>
+</div>
 
 <script type="module">
   /* =========================================================
-    ✅ ここだけ触れば「次回イベント」へ使い回ししやすい設定
+    ✅ 次回使い回し用：ここだけ基本触る
   ========================================================= */
   const CONFIG = {
     eventTitle: "第３回フォトイベント『青空編』",
-    subtitleLine1: "土曜 / 日曜　21:00〜（約1時間）",
-    subtitleLine2: "※各回 4〜10名ほどで開催予定です / 参加は任意・キャンセル可能",
-
-    // Assets: 同階層に置く想定（URLでもOK）
     assets: {
       loadGif: "load.gif",
       bgVideo: "mad.mp4",
       bgm: "ramune.mp3",
-      // 将来、当日進行で使う素材を増やしてもOK（ロード画面でプリロードします）
-      preloadImages: [
-        // 例： "https://example.com/banner.png"
-      ],
-      preloadVideos: [
-        // 例： "https://example.com/another.mp4"
-      ],
-      preloadAudio: [
-        // 例： "https://example.com/se.mp3"
-      ],
+      preloadImages: [],
+      preloadVideos: [],
+      preloadAudio: [],
     },
-
-    // 詳細ページの画像（URLを足すだけで増える）
     detailImages: [
-      // 1) コードで設定した画像URL
-      // 例： "https://example.com/detail1.png",
-      // 2) GitHubのPNG（例）
-      // 例： "https://raw.githubusercontent.com/USER/REPO/main/detail2.png",
+      // ここにURLを追加するだけ
+      // "https://example.com/detail1.png",
+      // "https://raw.githubusercontent.com/USER/REPO/main/detail2.png",
     ],
-
-    // クレジット（押すと表示）
     credits: [
       "制作：あなた（運営）",
       "音源：ramune.mp3（あなたの用意したファイル）",
       "背景：mad.mp4（あなたの用意したファイル）",
       "このページは Firebase 匿名認証 + Firestore を使用",
     ].join("\\n"),
-
-    // 参加枠
     sessions: {
-      sat: {
-        id: "sat_2100",
-        label: "☀ 土曜 / 21:00",
-        capacity: 10,     // 表の上限（受付終了）
-        hardMax: 16,      // 念のため内部最大（想定外の増加を抑制）
-      },
-      sun: {
-        id: "sun_2100",
-        label: "🌊 日曜 / 21:00",
-        capacity: 10,
-        hardMax: 16,
-      }
+      sat: { id:"sat_2100", label:"☀ 土曜 / 21:00", whenLine:"☀ 土曜 / 21:00〜", capacity:10, hardMax:16 },
+      sun: { id:"sun_2100", label:"🌊 日曜 / 21:00", whenLine:"🌊 日曜 / 21:00〜", capacity:10, hardMax:16 },
     },
-
-    // Firestore コレクション名（変えたくなったらここ）
     dbNames: {
       sessionsCol: "event_sessions",
       usersCol: "event_users",
       participantsSub: "participants",
     },
-
-    // 人数レンジ表示
     rangeLabel(count){
-      if (count <= 0) return "0（まだ0）";
+      if (count <= 0) return "0";
       if (count <= 3) return "1〜3";
       if (count <= 6) return "4〜6";
       if (count <= 9) return "7〜9";
       return "10+";
     },
-
-    // 「受付終了」判定は capacity（上限10）で出す
     isClosed(count, cap){ return count >= cap; }
   };
 
   /* =========================================================
-    Firebase（ユーザー指定の設定）
+    Firebase
   ========================================================= */
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
   import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-analytics.js";
+  import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
   import {
-    getAuth, onAuthStateChanged, signInAnonymously
-  } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
-  import {
-    getFirestore, doc, getDoc, setDoc, updateDoc, serverTimestamp,
-    runTransaction, deleteDoc, onSnapshot
+    getFirestore, doc, getDoc, setDoc, runTransaction, serverTimestamp, onSnapshot
   } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -1105,85 +807,87 @@
   const db = getFirestore(app);
 
   /* =========================================================
-    DOM
+    DOM helpers
   ========================================================= */
-  const $ = (sel)=>document.querySelector(sel);
+  const $ = (s)=>document.querySelector(s);
+
+  const appRoot = $("#app");
+  const bgVideo = $("#bgVideo");
+  const veil = $("#veil");
+  const frost = $("#frost");
+
+  const volSlider = $("#volSlider");
+  const statusText = $("#statusText");
+  const toast = $("#toast");
+
+  const creditBtn = $("#creditBtn");
+  const creditModal = $("#creditModal");
+  const creditText = $("#creditText");
+  const closeCredit = $("#closeCredit");
+
   const loaderScreen = $("#loaderScreen");
-  const tapToStart = $("#tapToStart");
   const loadGif = $("#loadGif");
+  const loadingText = $("#loadingText");
   const progressFill = $("#progressFill");
-  const progressText = $("#progressText");
+
+  const bubbleCanvas = $("#bubbleCanvas");
+  const titleLetters = $("#titleLetters");
 
   const homeScreen = $("#homeScreen");
   const detailsScreen = $("#detailsScreen");
   const joinScreen = $("#joinScreen");
   const waitScreen = $("#waitScreen");
 
-  const bgVideo = $("#bgVideo");
-  const veil = $("#veil");
-  const statusPill = $("#statusPill");
-  const volSlider = $("#volSlider");
-
-  const openCredit = $("#openCredit");
-  const creditModal = $("#creditModal");
-  const creditText = $("#creditText");
-  const closeCredit = $("#closeCredit");
-
-  const btnDetails = $("#btnDetails");
-  const btnJoin = $("#btnJoin");
+  const homeJoinBtn = $("#homeJoinBtn");
+  const homeDetailsBtn = $("#homeDetailsBtn");
 
   const backFromDetails = $("#backFromDetails");
   const backFromJoin = $("#backFromJoin");
   const backFromWait = $("#backFromWait");
 
+  const carImage = $("#carImage");
+  const carPrev = $("#carPrev");
+  const carNext = $("#carNext");
+  const carDots = $("#carDots");
+  const carViewport = $("#carViewport");
+
+  const rowSat = $("#rowSat");
+  const rowSun = $("#rowSun");
   const badgeSat = $("#badgeSat");
   const badgeSun = $("#badgeSun");
-  const btnJoinSat = $("#btnJoinSat");
-  const btnJoinSun = $("#btnJoinSun");
-  const satAltHint = $("#satAltHint");
-  const sunAltHint = $("#sunAltHint");
+  const joinConfirmBtn = $("#joinConfirmBtn");
 
-  const mySessionPill = $("#mySessionPill");
-  const btnLeave = $("#btnLeave");
-  const btnGoJoin = $("#btnGoJoin");
-
-  const toast = $("#toast");
+  const waitWhen = $("#waitWhen");
+  const leaveBtn = $("#leaveBtn");
 
   /* =========================================================
-    Audio / Master volume
-    - ramune.mp3: 再生開始時 0.20 → 4秒で 0.60 に上げる
-    - slider はサイト音量全体にリンク（初期50%）
+    Screen router + frost control
   ========================================================= */
-  const BGM = new Audio();
-  BGM.preload = "auto";
-  BGM.loop = true;
-  BGM.playsInline = true;
+  const Screens = { loader: loaderScreen, home: homeScreen, details: detailsScreen, join: joinScreen, wait: waitScreen };
 
-  const master = {
-    value: 0.50,        // slider 50%
-    bgmBaseStart: 0.20, // ramp start
-    bgmBaseEnd: 0.60,   // ramp end
-  };
+  function showScreen(name){
+    Object.values(Screens).forEach(el=>el.classList.add("hidden"));
+    Screens[name].classList.remove("hidden");
 
-  function setMasterVolume(v01){
-    master.value = Math.max(0, Math.min(1, v01));
-    // BGMは「base * master」で制御（baseはランプ用）
-    applyBgmVolume();
+    // Frost ON for details/join/wait only
+    const frostOn = (name === "details" || name === "join" || name === "wait");
+    appRoot.classList.toggle("frost-on", frostOn);
+
+    // Bubble canvas only on home
+    bubbleCanvas.classList.toggle("hidden", name !== "home");
+
+    // Credit button only after start (and keep away from top controls)
+    creditBtn.classList.toggle("hidden", name === "loader");
+
+    // allow scroll inside screens (fixed)
+    document.body.style.overflow = (name === "loader" || name === "home") ? "hidden" : "hidden";
   }
-  let bgmBase = master.bgmBaseStart;
-  function applyBgmVolume(){
-    BGM.volume = Math.max(0, Math.min(1, bgmBase * master.value));
-  }
-
-  volSlider.addEventListener("input", ()=>{
-    setMasterVolume(Number(volSlider.value)/100);
-  });
 
   /* =========================================================
-    Simple toast
+    Toast
   ========================================================= */
   let toastTimer = null;
-  function showToast(msg, ms=1800){
+  function showToast(msg, ms=1700){
     toast.textContent = msg;
     toast.classList.add("on");
     clearTimeout(toastTimer);
@@ -1191,122 +895,105 @@
   }
 
   /* =========================================================
-    Screen router (simple)
+    Loader text dots "ロード中…" animation
   ========================================================= */
-  const Screens = {
-    loader: loaderScreen,
-    home: homeScreen,
-    details: detailsScreen,
-    join: joinScreen,
-    wait: waitScreen
-  };
-
-  function showScreen(name){
-    Object.values(Screens).forEach(el=>el.classList.add("hidden"));
-    Screens[name].classList.remove("hidden");
-    window.scrollTo({top:0, behavior:"instant"});
+  let dotsTimer = null;
+  function startDots(){
+    let n = 0;
+    loadingText.textContent = "ロード中";
+    clearInterval(dotsTimer);
+    dotsTimer = setInterval(()=>{
+      n = (n + 1) % 4;
+      loadingText.textContent = "ロード中" + ".".repeat(n);
+    }, 380);
+  }
+  function stopDots(){
+    clearInterval(dotsTimer);
+    dotsTimer = null;
+    loadingText.textContent = "ロード完了";
   }
 
   /* =========================================================
-    Fancy button burst effect (click position)
+    Audio: master + BGM ramp (0.20 -> 0.60 in 4s), slider links all sound
   ========================================================= */
-  function bindBurst(btn){
-    btn.addEventListener("pointerdown", (e)=>{
-      const r = btn.getBoundingClientRect();
-      const x = ((e.clientX - r.left) / r.width) * 100;
-      const y = ((e.clientY - r.top) / r.height) * 100;
-      btn.style.setProperty("--x", x + "%");
-      btn.style.setProperty("--y", y + "%");
-      btn.classList.remove("boom");
-      void btn.offsetWidth;
-      btn.classList.add("boom");
-    });
+  const BGM = new Audio();
+  BGM.preload = "auto";
+  BGM.loop = true;
+  BGM.playsInline = true;
+
+  const master = { value: 0.50, bgmBaseStart: 0.20, bgmBaseEnd: 0.60 };
+  let bgmBase = master.bgmBaseStart;
+
+  function applyBgmVolume(){
+    BGM.volume = Math.max(0, Math.min(1, bgmBase * master.value));
   }
-  [btnDetails, btnJoin].forEach(bindBurst);
+  function setMasterVolume(v01){
+    master.value = Math.max(0, Math.min(1, v01));
+    applyBgmVolume();
+  }
+  volSlider.addEventListener("input", ()=>setMasterVolume(Number(volSlider.value)/100));
 
   /* =========================================================
-    Title bubble float-in animation (per letter)
-    - “消える”はしない / 到着後は微光シマーのみ
+    Title bubble float-in (keep)
   ========================================================= */
-  const titleLetters = $("#titleLetters");
-  const eventTitleEl = $("#eventTitle");
-
   function buildTitleLetters(text){
     titleLetters.innerHTML = "";
-    const chars = [...text];
-    chars.forEach((ch, i)=>{
+    [...text].forEach((ch)=>{
       const span = document.createElement("span");
       span.className = "letter";
       span.textContent = ch;
 
-      // ランダム揺れ・回転・遅延
-      const delay = 0.2 + Math.random()*0.6;         // 0.2〜0.8
-      const dur = 2.5 + Math.random()*1.5;           // 2.5〜4.0
-      const sx = (Math.random()*40 - 20);            // ±20px
-      const rot = (Math.random()*14 - 7);            // ±7deg
+      const delay = 0.2 + Math.random()*0.6;   // 0.2〜0.8
+      const dur   = 2.5 + Math.random()*1.5;   // 2.5〜4.0
+      const sx    = (Math.random()*40 - 20);   // ±20px
+      const rot   = (Math.random()*14 - 7);    // ±7deg
 
-      span.style.setProperty("--sx", sx.toFixed(1) + "px");
-      span.style.setProperty("--rot", rot.toFixed(2) + "deg");
+      span.style.setProperty("--sx", sx.toFixed(1)+"px");
+      span.style.setProperty("--rot", rot.toFixed(2)+"deg");
       span.style.animation = `floatIn ${dur.toFixed(2)}s ease-out ${delay.toFixed(2)}s forwards`;
 
-      // 到着後 hold を付ける（最後に少し待ってから）
-      const holdDelay = (delay + dur + 0.05) * 1000;
-      setTimeout(()=>span.classList.add("hold"), holdDelay);
+      const holdAt = (delay + dur + 0.05)*1000;
+      setTimeout(()=>span.classList.add("hold"), holdAt);
 
       titleLetters.appendChild(span);
     });
   }
 
   /* =========================================================
-    Bubble Canvas (behind title): continuous rising bubbles
-    - 下→上へランダム速度、横はサイン波ゆらぎ
-    - 輪郭ストローク + 内側ラジアルグラデ
+    Bubble canvas (home only)
   ========================================================= */
-  const bubbleCanvas = $("#bubbleCanvas");
   const bctx = bubbleCanvas.getContext("2d", { alpha:true });
-
   const bubbles = [];
   let bubbleRAF = 0;
+  let lastT = 0;
+
   function resizeCanvas(){
-    const hero = bubbleCanvas.parentElement;
-    const w = hero.clientWidth;
-    const h = hero.clientHeight;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    bubbleCanvas.width = Math.floor(w * dpr);
-    bubbleCanvas.height = Math.floor(h * dpr);
-    bubbleCanvas.style.width = w + "px";
-    bubbleCanvas.style.height = h + "px";
+    bubbleCanvas.width  = Math.floor(window.innerWidth * dpr);
+    bubbleCanvas.height = Math.floor(window.innerHeight * dpr);
+    bubbleCanvas.style.width = window.innerWidth + "px";
+    bubbleCanvas.style.height = window.innerHeight + "px";
     bctx.setTransform(dpr,0,0,dpr,0,0);
   }
   window.addEventListener("resize", resizeCanvas, {passive:true});
 
   function spawnBubble(){
-    const hero = bubbleCanvas.parentElement;
-    const w = hero.clientWidth;
-    const h = hero.clientHeight;
-
+    const w = window.innerWidth, h = window.innerHeight;
     const r = 6 + Math.random()*18;
-    const x = Math.random()*w;
-    const y = h + r + Math.random()*40;
-
-    const spd = 12 + Math.random()*28; // px/sec
-    const phase = Math.random()*Math.PI*2;
-    const amp = 10 + Math.random()*18;
-    const wob = 0.9 + Math.random()*1.2;
-
     bubbles.push({
-      x, y, r,
-      spd,
-      phase,
-      amp,
-      wob,
+      x: Math.random()*w,
+      y: h + r + Math.random()*40,
+      r,
+      spd: 12 + Math.random()*28,
+      phase: Math.random()*Math.PI*2,
+      amp: 10 + Math.random()*18,
+      wob: 0.9 + Math.random()*1.2,
       life: 0,
-      alpha: 0.15 + Math.random()*0.22
+      alpha: 0.14 + Math.random()*0.22
     });
   }
 
   function drawBubble(b){
-    // radial fill
     const g = bctx.createRadialGradient(b.x - b.r*0.35, b.y - b.r*0.35, b.r*0.2, b.x, b.y, b.r);
     g.addColorStop(0, `rgba(255,255,255,${b.alpha*0.55})`);
     g.addColorStop(0.45, `rgba(191,234,255,${b.alpha*0.22})`);
@@ -1317,7 +1004,6 @@
     bctx.fillStyle = g;
     bctx.fill();
 
-    // stroke
     bctx.beginPath();
     bctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
     bctx.strokeStyle = `rgba(247,251,255,${b.alpha*0.55})`;
@@ -1325,18 +1011,13 @@
     bctx.stroke();
   }
 
-  let lastT = 0;
   function bubbleLoop(t){
-    const hero = bubbleCanvas.parentElement;
-    const w = hero.clientWidth;
-    const h = hero.clientHeight;
-
-    const dt = Math.min(0.033, (t - lastT) / 1000 || 0.016);
+    const dt = Math.min(0.033, (t - lastT)/1000 || 0.016);
     lastT = t;
+    const w = window.innerWidth, h = window.innerHeight;
 
     bctx.clearRect(0,0,w,h);
 
-    // spawn rate (lighter for mobile)
     const isMobile = matchMedia("(max-width: 720px)").matches;
     const targetCount = isMobile ? 22 : 34;
     if (bubbles.length < targetCount && Math.random() < (isMobile ? 0.65 : 0.85)){
@@ -1350,51 +1031,38 @@
       b.y -= b.spd * dt;
       b.x += Math.sin(b.life * b.wob + b.phase) * (b.amp * dt);
 
-      // soft fade near top
       const topFade = Math.max(0, Math.min(1, (b.y / (h*0.35))));
-      const aKeep = b.alpha * (0.35 + topFade*0.65);
       const saved = b.alpha;
-      b.alpha = aKeep;
+      b.alpha = saved * (0.35 + topFade*0.65);
 
       drawBubble(b);
 
       b.alpha = saved;
-
-      if (b.y < -b.r - 30 || b.x < -80 || b.x > w + 80){
-        bubbles.splice(i,1);
-      }
+      if (b.y < -b.r - 30 || b.x < -80 || b.x > w + 80) bubbles.splice(i,1);
     }
 
     bubbleRAF = requestAnimationFrame(bubbleLoop);
   }
 
   /* =========================================================
-    Details carousel
+    Details carousel (only image + <> + dots)
   ========================================================= */
-  const carImage = $("#carImage");
-  const carPrev = $("#carPrev");
-  const carNext = $("#carNext");
-  const carDots = $("#carDots");
   let carIndex = 0;
-
   function setCarouselImages(imgs){
     const list = imgs.length ? imgs : [
-      // 空のときのプレースホルダ（必要なら消してOK）
       "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`
         <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750">
-          <defs>
-            <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0" stop-color="#7fd3ff" stop-opacity="0.22"/>
-              <stop offset="1" stop-color="#000000" stop-opacity="0.35"/>
-            </linearGradient>
-          </defs>
+          <defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0" stop-color="#7fd3ff" stop-opacity="0.22"/>
+            <stop offset="1" stop-color="#000" stop-opacity="0.35"/>
+          </linearGradient></defs>
           <rect width="100%" height="100%" fill="url(#g)"/>
-          <text x="50%" y="46%" font-size="54" text-anchor="middle" fill="rgba(255,255,255,.92)" font-family="serif">詳細画像を追加してください</text>
-          <text x="50%" y="56%" font-size="28" text-anchor="middle" fill="rgba(255,255,255,.72)" font-family="sans-serif">CONFIG.detailImages にURLを追加するだけ</text>
+          <text x="50%" y="50%" font-size="40" text-anchor="middle" fill="rgba(255,255,255,.90)" font-family="serif">
+            画像URLを CONFIG.detailImages に追加
+          </text>
         </svg>
       `)
     ];
-
     CONFIG.__carList = list;
     carDots.innerHTML = "";
     list.forEach((_, i)=>{
@@ -1405,7 +1073,6 @@
     });
     goCar(0);
   }
-
   function goCar(i){
     const list = CONFIG.__carList || [];
     if (!list.length) return;
@@ -1418,7 +1085,6 @@
 
   // swipe
   let sx=0, sy=0, dragging=false;
-  const carViewport = $("#carViewport");
   carViewport.addEventListener("pointerdown",(e)=>{
     dragging=true; sx=e.clientX; sy=e.clientY;
     carViewport.setPointerCapture(e.pointerId);
@@ -1433,125 +1099,89 @@
   });
 
   /* =========================================================
-    Firebase session model（壊れにくい設計）
-    - event_sessions/{sessionId} : { count, capacity, hardMax, updatedAt }
-    - event_sessions/{sessionId}/participants/{uid} : { joinedAt }
-    - event_users/{uid} : { sessionId|null, updatedAt }
-    参加/キャンセルは transaction で count を正しく増減。
-    「後から当日進行」を足しても、この構造はそのまま使える。
+    Firestore model (same)
   ========================================================= */
   const { sessionsCol, usersCol, participantsSub } = CONFIG.dbNames;
 
   let uid = null;
+  let mySessionId = null;
+  let selectedSessionId = null;
+
   let unsubSat = null;
   let unsubSun = null;
-  let mySessionId = null;
 
-  function setStatus(text){ statusPill.textContent = text; }
+  function setStatus(t){ statusText.textContent = t; }
 
-  function sessionDocRef(sessionId){
-    return doc(db, sessionsCol, sessionId);
-  }
-  function userDocRef(userId){
-    return doc(db, usersCol, userId);
-  }
-  function participantDocRef(sessionId, userId){
-    return doc(db, sessionsCol, sessionId, participantsSub, userId);
-  }
+  const sessionDocRef = (sid)=>doc(db, sessionsCol, sid);
+  const userDocRef = (u)=>doc(db, usersCol, u);
+  const participantDocRef = (sid,u)=>doc(db, sessionsCol, sid, participantsSub, u);
 
   async function ensureSessionDocs(){
-    // 初回にセッションドキュメントが無ければ作る（count=0）
     const all = [CONFIG.sessions.sat, CONFIG.sessions.sun];
     for (const s of all){
       const ref = sessionDocRef(s.id);
       const snap = await getDoc(ref);
       if (!snap.exists()){
         await setDoc(ref, {
-          count: 0,
-          capacity: s.capacity,
-          hardMax: s.hardMax,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+          count: 0, capacity: s.capacity, hardMax: s.hardMax,
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp()
         }, { merge:true });
       }else{
-        // capacity/hardMax など設定が変わったら反映
-        await setDoc(ref, {
-          capacity: s.capacity,
-          hardMax: s.hardMax,
-          updatedAt: serverTimestamp(),
-        }, { merge:true });
+        await setDoc(ref, { capacity: s.capacity, hardMax: s.hardMax, updatedAt: serverTimestamp() }, { merge:true });
       }
     }
   }
 
+  // keep latest counts for join button enable
+  const live = {
+    sat: { count:0, cap: CONFIG.sessions.sat.capacity, closed:false },
+    sun: { count:0, cap: CONFIG.sessions.sun.capacity, closed:false },
+  };
+
   function attachSessionListeners(){
-    // リアルタイムで badge を更新（レンジ表示 + 受付終了）
     unsubSat?.(); unsubSun?.();
     unsubSat = onSnapshot(sessionDocRef(CONFIG.sessions.sat.id), (snap)=>{
       const d = snap.data() || {count:0, capacity: CONFIG.sessions.sat.capacity};
-      updateScheduleUI("sat", d.count ?? 0, d.capacity ?? CONFIG.sessions.sat.capacity);
+      const c = Number(d.count ?? 0);
+      const cap = Number(d.capacity ?? CONFIG.sessions.sat.capacity);
+      live.sat.count = c; live.sat.cap = cap; live.sat.closed = CONFIG.isClosed(c, cap);
+      badgeSat.textContent = CONFIG.rangeLabel(c);
+      refreshJoinConfirmState();
     });
     unsubSun = onSnapshot(sessionDocRef(CONFIG.sessions.sun.id), (snap)=>{
       const d = snap.data() || {count:0, capacity: CONFIG.sessions.sun.capacity};
-      updateScheduleUI("sun", d.count ?? 0, d.capacity ?? CONFIG.sessions.sun.capacity);
+      const c = Number(d.count ?? 0);
+      const cap = Number(d.capacity ?? CONFIG.sessions.sun.capacity);
+      live.sun.count = c; live.sun.cap = cap; live.sun.closed = CONFIG.isClosed(c, cap);
+      badgeSun.textContent = CONFIG.rangeLabel(c);
+      refreshJoinConfirmState();
     });
-  }
-
-  function updateScheduleUI(which, count, cap){
-    const label = CONFIG.rangeLabel(count);
-    const closed = CONFIG.isClosed(count, cap);
-
-    const badge = which==="sat" ? badgeSat : badgeSun;
-    const btn = which==="sat" ? btnJoinSat : btnJoinSun;
-    const alt = which==="sat" ? satAltHint : sunAltHint;
-
-    badge.textContent = `現在の参加者：${label}`;
-    if (closed){
-      btn.textContent = "受付終了";
-      btn.disabled = true;
-      alt.textContent = "この日は受付終了です。もう片方の日程をご利用ください";
-    }else{
-      btn.textContent = "参加予定にする";
-      btn.disabled = false;
-      alt.textContent = "";
-    }
-
-    // すでに自分がその回なら UI を少し出す
-    if (mySessionId){
-      const isMe = (mySessionId === (which==="sat" ? CONFIG.sessions.sat.id : CONFIG.sessions.sun.id));
-      if (isMe){
-        btn.textContent = "参加中";
-        btn.disabled = true;
-        alt.textContent = "すでにこの日程で参加予定です";
-      }
-    }
   }
 
   async function loadMyState(){
     if (!uid) return;
-    const uref = userDocRef(uid);
-    const usnap = await getDoc(uref);
-    if (usnap.exists()){
-      mySessionId = usnap.data()?.sessionId || null;
-    } else {
-      mySessionId = null;
-    }
-    syncWaitUI();
+    const usnap = await getDoc(userDocRef(uid));
+    mySessionId = usnap.exists() ? (usnap.data()?.sessionId || null) : null;
+    applyMyStateToHome();
+    applyMyStateToJoinAccess();
+    applyWaitText();
   }
 
-  function syncWaitUI(){
-    if (mySessionId){
-      const label = mySessionId === CONFIG.sessions.sat.id ? CONFIG.sessions.sat.label : CONFIG.sessions.sun.label;
-      mySessionPill.textContent = `あなたの参加日：${label}`;
-    }else{
-      mySessionPill.textContent = "あなたの参加日：未登録";
+  function applyWaitText(){
+    if (!mySessionId){
+      waitWhen.textContent = "—";
+      return;
     }
+    waitWhen.textContent = (mySessionId === CONFIG.sessions.sat.id) ? CONFIG.sessions.sat.whenLine : CONFIG.sessions.sun.whenLine;
   }
 
+  /* =========================================================
+    ★ システム修正（要望）
+    いったん待機になった人は「予定を外す」まで別日程へ変更できない
+    → joinSession で current がある場合は必ず拒否
+  ========================================================= */
   async function joinSession(targetSessionId){
     if (!uid) { showToast("認証がまだです…"); return; }
-
-    const target = (targetSessionId === CONFIG.sessions.sat.id) ? CONFIG.sessions.sat : CONFIG.sessions.sun;
 
     try{
       await runTransaction(db, async (tx)=>{
@@ -1559,68 +1189,51 @@
         const uSnap = await tx.get(uref);
         const current = uSnap.exists() ? (uSnap.data().sessionId || null) : null;
 
-        // 既に同じ回なら何もしない
-        if (current === target.id){
-          return;
+        // ★ すでに参加中なら「外してから」
+        if (current){
+          throw new Error("MUST_LEAVE_FIRST");
         }
 
-        // target session
-        const srefNew = sessionDocRef(target.id);
-        const sSnapNew = await tx.get(srefNew);
-        if (!sSnapNew.exists()){
-          tx.set(srefNew, { count:0, capacity: target.capacity, hardMax: target.hardMax, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge:true });
-        }
-        const sDataNew = sSnapNew.exists() ? sSnapNew.data() : {count:0, capacity: target.capacity, hardMax: target.hardMax};
+        const target = (targetSessionId === CONFIG.sessions.sat.id) ? CONFIG.sessions.sat : CONFIG.sessions.sun;
 
-        const countNew = Number(sDataNew.count ?? 0);
-        const capNew = Number(sDataNew.capacity ?? target.capacity);
-        const hardNew = Number(sDataNew.hardMax ?? target.hardMax);
+        const sref = sessionDocRef(target.id);
+        const sSnap = await tx.get(sref);
+        const sData = sSnap.exists() ? sSnap.data() : {count:0, capacity: target.capacity, hardMax: target.hardMax};
 
-        // 受付終了判定（capacity） + 念のhardMax
-        if (countNew >= capNew || countNew >= hardNew){
+        const count = Number(sData.count ?? 0);
+        const cap = Number(sData.capacity ?? target.capacity);
+        const hard = Number(sData.hardMax ?? target.hardMax);
+
+        if (count >= cap || count >= hard){
           throw new Error("CLOSED");
         }
 
-        // もし別の回に参加済みなら、先に減算＆参加記録削除
-        if (current){
-          const srefOld = sessionDocRef(current);
-          const pOld = participantDocRef(current, uid);
-
-          const sSnapOld = await tx.get(srefOld);
-          const pSnapOld = await tx.get(pOld);
-
-          if (pSnapOld.exists()){
-            tx.delete(pOld);
-          }
-          if (sSnapOld.exists()){
-            const oldCount = Number(sSnapOld.data().count ?? 0);
-            tx.update(srefOld, { count: Math.max(0, oldCount - (pSnapOld.exists() ? 1 : 0)), updatedAt: serverTimestamp() });
-          }
+        // participant
+        const pref = participantDocRef(target.id, uid);
+        const pSnap = await tx.get(pref);
+        if (pSnap.exists()){
+          // 万一残ってたら整合だけ合わせる
+          tx.set(uref, { sessionId: target.id, updatedAt: serverTimestamp() }, { merge:true });
+          return;
         }
 
-        // target participants doc（重複防止：uid固定）
-        const pNew = participantDocRef(target.id, uid);
-        const pSnapNew = await tx.get(pNew);
-
-        // 参加記録が無いときのみ増やす
-        if (!pSnapNew.exists()){
-          tx.set(pNew, { joinedAt: serverTimestamp() }, { merge:true });
-          tx.update(srefNew, { count: countNew + 1, updatedAt: serverTimestamp() });
-        }
-
-        // user state
+        tx.set(pref, { joinedAt: serverTimestamp() }, { merge:true });
         tx.set(uref, { sessionId: target.id, updatedAt: serverTimestamp() }, { merge:true });
+        tx.set(sref, { updatedAt: serverTimestamp() }, { merge:true });
+        tx.set(sref, { count: count + 1 }, { merge:true });
       });
 
       await loadMyState();
       showToast("参加予定に追加しました🌤");
       showScreen("wait");
     }catch(e){
-      if (e?.message === "CLOSED"){
-        showToast("この回は受付終了です。もう片方をご利用ください。", 2400);
+      if (e?.message === "MUST_LEAVE_FIRST"){
+        showToast("変更は「予定を外す」後にできます", 2200);
+      }else if (e?.message === "CLOSED"){
+        showToast("この回は受付終了です", 1800);
       }else{
         console.error(e);
-        showToast("参加登録に失敗しました（通信/設定）", 2200);
+        showToast("参加登録に失敗しました", 2000);
       }
     }
   }
@@ -1642,11 +1255,15 @@
 
         if (pSnap.exists()){
           tx.delete(pref);
+          if (sSnap.exists()){
+            const c = Number(sSnap.data().count ?? 0);
+            tx.set(sref, { count: Math.max(0, c-1), updatedAt: serverTimestamp() }, { merge:true });
+          }
+        }else{
+          // participant無しでも userだけ外す
+          tx.set(sref, { updatedAt: serverTimestamp() }, { merge:true });
         }
-        if (sSnap.exists()){
-          const c = Number(sSnap.data().count ?? 0);
-          tx.update(sref, { count: Math.max(0, c - (pSnap.exists() ? 1 : 0)), updatedAt: serverTimestamp() });
-        }
+
         tx.set(uref, { sessionId: null, updatedAt: serverTimestamp() }, { merge:true });
       });
 
@@ -1655,18 +1272,102 @@
       showScreen("join");
     }catch(e){
       console.error(e);
-      showToast("キャンセルに失敗しました", 2200);
+      showToast("キャンセルに失敗しました", 2000);
     }
   }
 
   /* =========================================================
-    Loader / Preload
-    - tap → 匿名認証 → プリロード（軽め） → homeへ
-    - bg video: black→薄く→表示
-    - bgm: 再生開始と同時にタイトルアニメ開始
+    Join UI selection + confirm button state
+  ========================================================= */
+  function setSelectedSession(sid){
+    selectedSessionId = sid;
+    rowSat.classList.toggle("on", sid === CONFIG.sessions.sat.id);
+    rowSun.classList.toggle("on", sid === CONFIG.sessions.sun.id);
+    refreshJoinConfirmState();
+  }
+
+  function refreshJoinConfirmState(){
+    // 参加中なら join 画面自体に来ない設計だが念のため
+    if (mySessionId){
+      joinConfirmBtn.disabled = true;
+      return;
+    }
+    if (!selectedSessionId){
+      joinConfirmBtn.disabled = true;
+      return;
+    }
+    const which = (selectedSessionId === CONFIG.sessions.sat.id) ? "sat" : "sun";
+    joinConfirmBtn.disabled = !!live[which].closed;
+  }
+
+  function applyMyStateToHome(){
+    // 参加中なら「参加予定」ボタンは “押せない（再応募不可）”
+    if (mySessionId){
+      homeJoinBtn.disabled = true;
+      homeJoinBtn.textContent = "参加中";
+    }else{
+      homeJoinBtn.disabled = false;
+      homeJoinBtn.textContent = "参加予定";
+    }
+  }
+
+  function applyMyStateToJoinAccess(){
+    // 参加中は Join 画面へ行かず Waitへ
+    // （要望：待機になった人は参加予定を押しても再応募できない）
+    // → homeJoinBtnはdisabled。もしどこかでJoinへ来ても、joinSessionで拒否。
+  }
+
+  /* =========================================================
+    Events
+  ========================================================= */
+  rowSat.addEventListener("click", ()=>setSelectedSession(CONFIG.sessions.sat.id));
+  rowSun.addEventListener("click", ()=>setSelectedSession(CONFIG.sessions.sun.id));
+  rowSat.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setSelectedSession(CONFIG.sessions.sat.id); }});
+  rowSun.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setSelectedSession(CONFIG.sessions.sun.id); }});
+
+  joinConfirmBtn.addEventListener("click", ()=>{
+    if (!selectedSessionId) return;
+    joinSession(selectedSessionId);
+  });
+
+  leaveBtn.addEventListener("click", ()=>leaveSession());
+
+  homeDetailsBtn.addEventListener("click", ()=>{ showScreen("details"); });
+  homeJoinBtn.addEventListener("click", ()=>{
+    // 参加中は押せない（disabled）。未参加ならjoinへ。
+    if (mySessionId) return;
+    selectedSessionId = null;
+    rowSat.classList.remove("on");
+    rowSun.classList.remove("on");
+    joinConfirmBtn.disabled = true;
+    showScreen("join");
+  });
+
+  backFromDetails.addEventListener("click", ()=>showScreen("home"));
+  backFromJoin.addEventListener("click", ()=>showScreen("home"));
+  backFromWait.addEventListener("click", ()=>showScreen("home"));
+
+  // Credits
+  creditText.textContent = CONFIG.credits;
+  creditBtn.addEventListener("click", ()=>creditModal.classList.add("on"));
+  closeCredit.addEventListener("click", ()=>creditModal.classList.remove("on"));
+  creditModal.addEventListener("click",(e)=>{ if(e.target===creditModal) creditModal.classList.remove("on"); });
+
+  // Tap anywhere to re-try BGM play if blocked
+  document.addEventListener("pointerdown", async ()=>{
+    if (!BGM.src) return;
+    if (BGM.paused){
+      try{ await BGM.play(); }catch(_){}
+    }
+  }, {passive:true});
+
+  /* =========================================================
+    Start flow (tap anywhere on loader)
+    - 最初から load.gif 表示
+    - 画面タップ → 匿名認証 → preload → home
+    - black veil: 6s fully black, then 5s fade out
   ========================================================= */
   function isLowPower(){
-    // ざっくり判定：モバイル+省リソース
     const mobile = matchMedia("(max-width: 720px)").matches;
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     return mobile || reduce;
@@ -1675,7 +1376,6 @@
   async function preloadAssets(){
     const jobs = [];
 
-    // images
     const imgs = [
       CONFIG.assets.loadGif,
       ...CONFIG.assets.preloadImages,
@@ -1691,7 +1391,6 @@
       }));
     });
 
-    // videos (metadata only)
     const vids = [CONFIG.assets.bgVideo, ...CONFIG.assets.preloadVideos].filter(Boolean);
     vids.forEach((src)=>{
       jobs.push(new Promise((res)=>{
@@ -1703,7 +1402,6 @@
       }));
     });
 
-    // audio (metadata only)
     const auds = [CONFIG.assets.bgm, ...CONFIG.assets.preloadAudio].filter(Boolean);
     auds.forEach((src)=>{
       jobs.push(new Promise((res)=>{
@@ -1715,78 +1413,31 @@
       }));
     });
 
-    // run with progress
     const total = Math.max(1, jobs.length);
     let done = 0;
-    function setProg(){
+    const concurrency = isLowPower() ? 4 : 8;
+    let idx = 0;
+
+    function tick(){
       done++;
       const p = Math.round((done/total)*100);
       progressFill.style.width = p + "%";
-      progressText.textContent = `ロード中… ${p}%`;
     }
-
-    // Low power: limit concurrency a bit
-    const concurrency = isLowPower() ? 4 : 8;
-    let idx = 0;
 
     const runners = new Array(concurrency).fill(0).map(async ()=>{
       while (idx < jobs.length){
         const j = jobs[idx++];
         try{ await j; }catch(_){}
-        setProg();
+        tick();
       }
     });
 
     await Promise.all(runners);
-    progressText.textContent = "すべて読み込めました";
     progressFill.style.width = "100%";
-  }
-
-  async function startBgmAndAnimations(){
-    // bg video
-    bgVideo.src = CONFIG.assets.bgVideo;
-    // iOS対策：mutedのままplay試行。背景用途で音は不要
-    try{ await bgVideo.play(); }catch(_){ /* ignore */ }
-    // fade black → video
-    setTimeout(()=>veil.classList.add("fade"), 150);
-    setTimeout(()=>bgVideo.classList.add("on"), 700);
-
-    // BGM
-    BGM.src = CONFIG.assets.bgm;
-    bgmBase = master.bgmBaseStart;
-    applyBgmVolume();
-    try{
-      await BGM.play(); // user gesture後なので成功しやすい
-    }catch(e){
-      console.warn("BGM play blocked:", e);
-      showToast("音が出ない場合は画面をもう一度タップ", 2600);
-    }
-
-    // volume ramp: 0.20 -> 0.60 over 4s
-    const start = performance.now();
-    const dur = 4000;
-    const tick = ()=>{
-      const t = performance.now() - start;
-      const k = Math.max(0, Math.min(1, t/dur));
-      bgmBase = master.bgmBaseStart + (master.bgmBaseEnd - master.bgmBaseStart) * k;
-      applyBgmVolume();
-      if (k < 1) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-
-    // Title animation build
-    eventTitleEl.setAttribute("data-text", CONFIG.eventTitle);
-    buildTitleLetters(CONFIG.eventTitle);
-
-    // Bubble canvas
-    resizeCanvas();
-    cancelAnimationFrame(bubbleRAF);
-    bubbleRAF = requestAnimationFrame(bubbleLoop);
   }
 
   async function initFirebaseAuth(){
     setStatus("接続：認証中");
-    // 匿名認証
     await signInAnonymously(auth);
     return new Promise((res)=>{
       const off = onAuthStateChanged(auth, (user)=>{
@@ -1799,28 +1450,73 @@
     });
   }
 
-  async function initAppAfterTap(){
-    tapToStart.disabled = true;
-    tapToStart.textContent = "開始中…";
-    progressText.textContent = "準備中…";
+  async function ensureSessionDocs(){
+    const all = [CONFIG.sessions.sat, CONFIG.sessions.sun];
+    for (const s of all){
+      const ref = sessionDocRef(s.id);
+      const snap = await getDoc(ref);
+      if (!snap.exists()){
+        await setDoc(ref, { count:0, capacity:s.capacity, hardMax:s.hardMax, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge:true });
+      }else{
+        await setDoc(ref, { capacity:s.capacity, hardMax:s.hardMax, updatedAt: serverTimestamp() }, { merge:true });
+      }
+    }
+  }
 
-    // set assets in DOM
+  async function startBgmAndTitle(){
+    // bg video start (muted loop)
+    bgVideo.src = CONFIG.assets.bgVideo;
+    try{ await bgVideo.play(); }catch(_){}
+
+    // black veil timing: 6s stay black, then fade 5s
+    setTimeout(()=>veil.classList.add("fade"), 6000);
+
+    // BGM
+    BGM.src = CONFIG.assets.bgm;
+    bgmBase = master.bgmBaseStart;
+    applyBgmVolume();
+    try{ await BGM.play(); }catch(e){
+      // ok: user can tap again
+      showToast("音が出ない場合はもう一度タップ", 2400);
+    }
+
+    // ramp 0.20 -> 0.60 over 4s
+    const start = performance.now();
+    const dur = 4000;
+    const step = ()=>{
+      const t = performance.now() - start;
+      const k = Math.max(0, Math.min(1, t/dur));
+      bgmBase = master.bgmBaseStart + (master.bgmBaseEnd - master.bgmBaseStart) * k;
+      applyBgmVolume();
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+
+    // title letters + bubbles (start when BGM starts)
+    buildTitleLetters(CONFIG.eventTitle);
+    resizeCanvas();
+    cancelAnimationFrame(bubbleRAF);
+    bubbleRAF = requestAnimationFrame(bubbleLoop);
+  }
+
+  // Initial: show loader, start dots, show gif immediately
+  function bootVisual(){
+    showScreen("loader");
     loadGif.src = CONFIG.assets.loadGif;
-    bgVideo.setAttribute("playsinline", "");
-    bgVideo.muted = true;
-    bgVideo.loop = true;
-
-    // UI text
-    document.title = CONFIG.eventTitle;
-    $("#eventTitle").setAttribute("data-text", CONFIG.eventTitle);
-
+    startDots();
+    progressFill.style.width = "0%";
+    setMasterVolume(Number(volSlider.value)/100);
     creditText.textContent = CONFIG.credits;
     setCarouselImages(CONFIG.detailImages);
+  }
+  bootVisual();
 
-    // initial volume
-    setMasterVolume(Number(volSlider.value)/100);
+  let started = false;
+  loaderScreen.addEventListener("click", async ()=>{
+    if (started) return;
+    started = true;
 
-    // Auth + ensure docs + listeners
+    setStatus("接続：開始");
     try{
       await initFirebaseAuth();
       setStatus("接続：Firestore準備");
@@ -1831,101 +1527,26 @@
     }catch(e){
       console.error(e);
       setStatus("接続：エラー");
-      showToast("Firebase接続に失敗（設定/通信）", 2600);
-      // それでもUIだけは見せる
+      // UIは続行
     }
 
-    // Preload
+    // preload
     await preloadAssets();
+    stopDots();
 
-    // 演出：ロード→ホームへ切替（数秒の「上から下スクロール」風）
-    progressText.textContent = "オープニング…";
-    // オープニング演出（軽め）：ホームを先に表示してからフェード
+    // start bgm/title and go home
+    await startBgmAndTitle();
     showScreen("home");
-
-    // start bgm + title animation when BGM starts
-    await startBgmAndAnimations();
-
-    // hide loader with fade/pop
-    loaderScreen.animate([
-      { opacity: 1, transform: "translateY(0px)" },
-      { opacity: 0, transform: "translateY(-10px)" }
-    ], { duration: 520, easing: "ease", fill:"forwards" });
-
-    setTimeout(()=>loaderScreen.classList.add("hidden"), 520);
-  }
-
-  tapToStart.addEventListener("click", ()=>{
-    initAppAfterTap();
   });
 
   /* =========================================================
-    Home buttons
+    Home -> Details/Join gating:
+    - 参加中は homeJoinBtn が disabled (再応募不可)
+    - Join画面へは未参加のみ
+    - 参加中の人がどこかで joinSession を呼んでも必ず拒否（外すまで変更不可）
   ========================================================= */
-  function popButtonsThen(fn){
-    // “押した瞬間はじけて消える”の雰囲気（軽め）
-    btnDetails.classList.add("popAway");
-    btnJoin.classList.add("popAway");
-    setTimeout(()=>{
-      btnDetails.classList.remove("popAway");
-      btnJoin.classList.remove("popAway");
-      fn();
-    }, 260);
-  }
+  function applyMyStateToJoinAccess(){ /* already handled by disabled + joinSession guard */ }
 
-  btnDetails.addEventListener("click", ()=>{
-    popButtonsThen(()=>showScreen("details"));
-  });
-  btnJoin.addEventListener("click", ()=>{
-    popButtonsThen(async ()=>{
-      await loadMyState();
-      showScreen(mySessionId ? "wait" : "join");
-    });
-  });
-
-  backFromDetails.addEventListener("click", ()=>showScreen("home"));
-  backFromJoin.addEventListener("click", ()=>showScreen("home"));
-  backFromWait.addEventListener("click", ()=>showScreen("home"));
-
-  btnGoJoin.addEventListener("click", async ()=>{
-    await loadMyState();
-    showScreen("join");
-  });
-
-  /* =========================================================
-    Join actions
-  ========================================================= */
-  btnJoinSat.addEventListener("click", ()=>joinSession(CONFIG.sessions.sat.id));
-  btnJoinSun.addEventListener("click", ()=>joinSession(CONFIG.sessions.sun.id));
-  btnLeave.addEventListener("click", ()=>leaveSession());
-
-  /* =========================================================
-    Credits modal
-  ========================================================= */
-  openCredit.addEventListener("click", ()=>creditModal.classList.add("on"));
-  closeCredit.addEventListener("click", ()=>creditModal.classList.remove("on"));
-  creditModal.addEventListener("click", (e)=>{
-    if (e.target === creditModal) creditModal.classList.remove("on");
-  });
-
-  /* =========================================================
-    Safety: if user returns later and BGM is blocked, tapping anywhere tries again
-  ========================================================= */
-  document.addEventListener("pointerdown", async ()=>{
-    if (!BGM.src) return;
-    if (BGM.paused){
-      try{ await BGM.play(); }catch(_){}
-    }
-  }, {passive:true});
-
-  /* =========================================================
-    Optional: expose tiny debug in console
-  ========================================================= */
-  window.__AOZORA = {
-    CONFIG,
-    get uid(){ return uid; },
-    get mySessionId(){ return mySessionId; }
-  };
 </script>
 </body>
 </html>
