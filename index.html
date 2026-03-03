@@ -1535,17 +1535,16 @@
 </script>
 
 
-
-  <script>
+<script>
 (() => {
   // =========================
-  // 追加：ホームUIの段階表示 + 黒フェイド直前の炭酸シュワ burst + pushu.mp3
-  // 既存module内の変数には触れない（安全に“追加だけ”）
+  // 修正版：burst が 4.8秒遅い → 4.8秒前倒し
+  //          burst 自体もフェイドアウト
+  //          粒サイズを既存（6〜24px相当）に合わせる
   // =========================
 
   const $ = (s) => document.querySelector(s);
 
-  const veil = $("#veil");
   const homeScreen = $("#homeScreen");
   const homeSub = $("#homeSub");                 // 「土曜/日曜21:00〜 約1時間」
   const homeJoinBtn = $("#homeJoinBtn");         // 参加予定ボタン
@@ -1563,13 +1562,12 @@
   }
   if (volSlider){
     volSlider.addEventListener("input", () => {
-      // 少し小さめに（好みで調整可）
       pushu.volume = Math.min(1, getMasterVol01() * 0.85);
     });
   }
   pushu.volume = Math.min(1, getMasterVol01() * 0.85);
 
-  // --- 最初は非表示にする（タイトル出現段階では出さない） ---
+  // --- 最初は非表示にする（タイトル演出中にUIを出さない） ---
   function hardHideHomeUI(){
     if (!homeSub || !homeJoinBtn || !homeDetailsBtn) return;
 
@@ -1585,13 +1583,10 @@
     hideStyle(homeJoinBtn);
   }
 
-  // --- ふわっと出すアニメ（duration秒かけて） ---
   function reveal(el, durationSec){
     if (!el) return;
-    // 初期化（万一途中からでもOKに）
     el.style.willChange = "opacity, transform, filter";
     el.style.transition = `opacity ${durationSec}s ease, transform ${durationSec}s ease, filter ${durationSec}s ease`;
-    // 次フレームで反映
     requestAnimationFrame(() => {
       el.style.opacity = "1";
       el.style.transform = "translateY(0px)";
@@ -1602,12 +1597,15 @@
 
   // =========================
   // 炭酸シュワ burst（追加Canvas）
-  // - 黒フェイドが消える0.5秒前〜1.5秒間
+  //  - 4.8秒前倒し（遅延修正）
+  //  - 演出の終盤で canvas も泡もフェイドアウト
+  //  - 粒サイズ：既存と同帯（6〜24px）
   // =========================
   let burstCanvas = null;
   let bctx = null;
   let burstRAF = 0;
   let burstStartMs = 0;
+  let burstDurationMs = 1500;
   const burstBubbles = [];
 
   function ensureBurstCanvas(){
@@ -1616,10 +1614,10 @@
     burstCanvas.id = "burstCanvas";
     burstCanvas.style.position = "fixed";
     burstCanvas.style.inset = "0";
-    burstCanvas.style.zIndex = "21"; // homeの上、UIの下寄り（必要なら上げ下げしてOK）
+    burstCanvas.style.zIndex = "21"; // home上・UI下（必要なら上げてOK）
     burstCanvas.style.pointerEvents = "none";
     burstCanvas.style.opacity = "0";
-    burstCanvas.style.transition = "opacity 120ms ease";
+    burstCanvas.style.transition = "opacity 220ms ease";
     document.body.appendChild(burstCanvas);
     bctx = burstCanvas.getContext("2d", { alpha:true });
 
@@ -1637,32 +1635,41 @@
 
   function spawnBurstBubble(){
     const w = window.innerWidth, h = window.innerHeight;
-    // 小さめ多め＝炭酸感
-    const r = 2.5 + Math.random()*6.5;
-    const x = Math.random()*w;
-    const y = h + 20 + Math.random()*80;
 
-    // 一気に上へ（速度高め）
-    const spd = 220 + Math.random()*420; // px/sec
-    const drift = (Math.random()*2 - 1) * (30 + Math.random()*70); // 横ブレ
-    const wob = 6 + Math.random()*18;
+    // ✅ 既存（6〜24px）に合わせる
+    const r = 6 + Math.random()*18;
+
+    const x = Math.random()*w;
+    const y = h + r + Math.random()*60;
+
+    // 炭酸っぽく一気に上へ（高速度）
+    const spd = 260 + Math.random()*520; // px/sec
+
+    // 横ブレ（既存泡に近いゆらぎ）
+    const amp = 10 + Math.random()*18;
+    const wob = 0.9 + Math.random()*1.2;
 
     burstBubbles.push({
       x, y, r,
       spd,
-      drift,
+      amp,
       wob,
       phase: Math.random()*Math.PI*2,
       life: 0,
-      alpha: 0.16 + Math.random()*0.22
+      alpha: 0.14 + Math.random()*0.22
     });
   }
 
-  function drawBurstBubble(b){
-    // 内側ラジアル＋輪郭（シュワ感）
-    const g = bctx.createRadialGradient(b.x - b.r*0.35, b.y - b.r*0.35, b.r*0.2, b.x, b.y, b.r);
-    g.addColorStop(0, `rgba(255,255,255,${b.alpha*0.55})`);
-    g.addColorStop(0.45, `rgba(191,234,255,${b.alpha*0.28})`);
+  function drawBurstBubble(b, globalFade){
+    // globalFade: 1 → 0 に落ちる（演出終盤でフェイドアウト）
+    const a = b.alpha * globalFade;
+
+    const g = bctx.createRadialGradient(
+      b.x - b.r*0.35, b.y - b.r*0.35, b.r*0.2,
+      b.x, b.y, b.r
+    );
+    g.addColorStop(0, `rgba(255,255,255,${a*0.55})`);
+    g.addColorStop(0.45, `rgba(191,234,255,${a*0.22})`);
     g.addColorStop(1, `rgba(127,211,255,0)`);
 
     bctx.beginPath();
@@ -1672,14 +1679,18 @@
 
     bctx.beginPath();
     bctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
-    bctx.strokeStyle = `rgba(247,251,255,${b.alpha*0.65})`;
+    bctx.strokeStyle = `rgba(247,251,255,${a*0.55})`;
     bctx.lineWidth = 1;
     bctx.stroke();
   }
 
   function runBurst(durationMs = 1500){
     ensureBurstCanvas();
+    burstDurationMs = durationMs;
+
+    // canvas を出す（あとで自動で消す）
     burstCanvas.style.opacity = "1";
+
     burstBubbles.length = 0;
     burstStartMs = performance.now();
 
@@ -1699,45 +1710,44 @@
 
       bctx.clearRect(0,0,w,h);
 
-      // 1.5秒だけ“密度高め”に大量生成
       const elapsed = t - burstStartMs;
-      const k = 1 - Math.max(0, Math.min(1, elapsed / durationMs));
+      const p = Math.max(0, Math.min(1, elapsed / burstDurationMs)); // 0..1
 
-      // 初動ほど多く
-      const spawnN = Math.floor(18 + 22*k); // 18〜40/Frame程度
+      // ✅ 演出終盤で “全体” フェイドアウト（最後40%で 1→0）
+      const globalFade = (p < 0.60) ? 1 : (1 - (p - 0.60) / 0.40);
+
+      // canvas 自体も同じタイミングでフェイドアウト
+      burstCanvas.style.opacity = String(Math.max(0, Math.min(1, globalFade)));
+
+      // 初動ほど密度高く（シュワ！）
+      const k = 1 - p; // 1→0
+      const spawnN = Math.floor(10 + 22*k); // 10〜32 / frame
       for (let i=0;i<spawnN;i++) spawnBurstBubble();
 
-      // 更新＆描画
       for (let i=burstBubbles.length-1;i>=0;i--){
         const b = burstBubbles[i];
         b.life += dt;
 
-        // 上昇
         b.y -= b.spd * dt;
+        b.x += Math.sin(b.life * b.wob + b.phase) * (b.amp * dt);
 
-        // 横ゆらぎ（炭酸っぽい“細かいぶれ”）
-        b.x += (b.drift * dt * 0.35) + Math.sin(b.life * (10 + b.wob) + b.phase) * (18 * dt);
+        // 上に行くほど薄く（既存寄せ）
+        const topFade = Math.max(0, Math.min(1, (b.y / (h*0.35))));
+        const localFade = (0.35 + topFade*0.65);
 
-        // 上に行くほど薄く
-        const topFade = Math.max(0, Math.min(1, (b.y / (h*0.45))));
-        const saved = b.alpha;
-        b.alpha = saved * (0.25 + topFade*0.75);
-
-        drawBurstBubble(b);
-        b.alpha = saved;
+        drawBurstBubble(b, globalFade * localFade);
 
         if (b.y < -b.r - 40 || b.x < -120 || b.x > w + 120){
           burstBubbles.splice(i,1);
         }
       }
 
-      if (elapsed < durationMs){
+      if (elapsed < burstDurationMs){
         burstRAF = requestAnimationFrame(loop);
       }else{
-        // 終了
-        burstCanvas.style.opacity = "0";
         cancelAnimationFrame(burstRAF);
         burstRAF = 0;
+        burstCanvas.style.opacity = "0";
       }
     };
 
@@ -1746,10 +1756,9 @@
   }
 
   // =========================
-  // 黒フェイド完了タイミングを基準に演出スケジュール
-  // - 既存コードは「fade開始: tap後+6秒 / fade時間: 5秒」なので
-  //   フェイド完了は tap後+11秒（=11000ms）
-  // - ただし安全に、home表示を検知したタイミングを起点にする
+  // スケジュール（home表示を起点）
+  // 既存仕様：フェイド完了 = tap後 11000ms（6s黒固定 + 5sフェイド）
+  // ✅ burst が 4.8秒遅い → 4800ms 前倒し
   // =========================
   let scheduled = false;
 
@@ -1757,33 +1766,27 @@
     if (scheduled) return;
     scheduled = true;
 
-    // タイトル以外をまず隠す
     hardHideHomeUI();
 
-    // homeが出た時点を t=0 とする（既存コードは home表示直後に fadeタイマーが走る）
-    // fadeEnd = 11000ms (6s stay + 5s fade)
     const fadeEnd = 11000;
+    const advance = 4800;
 
-    // 炭酸burst：fadeEndの0.5秒前から1.5秒
-    const burstAt = Math.max(0, fadeEnd - 500);
+    // ✅ 黒フェイド消失0.5秒前から1.5秒… の “予定” を前倒し
+    // 元：fadeEnd - 500
+    // 新：fadeEnd - 500 - 4800
+    const burstAt = Math.max(0, fadeEnd - 500 - advance);
 
     setTimeout(() => runBurst(1500), burstAt);
 
-    // UIの段階表示：fadeEndになったら開始
+    // UIの段階表示は「黒フェイドが消えたら」なので、そのまま fadeEnd 起点
     setTimeout(() => {
-      // ①土曜/日曜… を3秒で表示
       reveal(homeSub, 3);
-
-      // ②2秒後に イベント詳細 を3秒で表示
       setTimeout(() => reveal(homeDetailsBtn, 3), 2000);
-
-      // ③その後（イベント詳細が表示し終わった後）参加ボタンを5秒で表示
-      //    details開始がt+2s、dur3s → 終了t+5s
       setTimeout(() => reveal(homeJoinBtn, 5), 5000);
     }, fadeEnd);
   }
 
-  // homeScreenが表示されたらスケジュール開始（classの変化を監視）
+  // home表示を検知して開始
   const mo = new MutationObserver(() => {
     if (homeScreen && !homeScreen.classList.contains("hidden")) {
       scheduleHomeRevealSequence();
@@ -1792,8 +1795,6 @@
   if (homeScreen) {
     mo.observe(homeScreen, { attributes:true, attributeFilter:["class"] });
   }
-
-  // すでにhomeが表示されていた場合（リロード等）にも対応
   if (homeScreen && !homeScreen.classList.contains("hidden")) {
     scheduleHomeRevealSequence();
   }
