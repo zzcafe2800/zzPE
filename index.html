@@ -1823,5 +1823,132 @@
   if (!homeScreen.classList.contains("hidden")) hideBubblesDuringBlack();
 })();
 </script>
+  <script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+
+  // ====== ① 「参加中」をクリックで待機へ ======
+  const appRoot = $("#app");
+  const homeJoinBtn = $("#homeJoinBtn");
+  const bubbleCanvas = $("#bubbleCanvas");
+  const creditBtn = $("#creditBtn");
+
+  const loaderScreen  = $("#loaderScreen");
+  const homeScreen    = $("#homeScreen");
+  const detailsScreen = $("#detailsScreen");
+  const joinScreen    = $("#joinScreen");
+  const waitScreen    = $("#waitScreen");
+
+  function gotoWaitScreen(){
+    // 既存の showScreen("wait") 相当を“外から”再現（安全にDOMだけ）
+    if (loaderScreen)  loaderScreen.classList.add("hidden");
+    if (homeScreen)    homeScreen.classList.add("hidden");
+    if (detailsScreen) detailsScreen.classList.add("hidden");
+    if (joinScreen)    joinScreen.classList.add("hidden");
+    if (waitScreen)    waitScreen.classList.remove("hidden");
+
+    // Home以外はぼかしON
+    if (appRoot) appRoot.classList.add("frost-on");
+
+    // 泡キャンバスはHome専用（待機では隠す）
+    if (bubbleCanvas) bubbleCanvas.classList.add("hidden");
+
+    // クレジットは表示（loader以外）
+    if (creditBtn) creditBtn.classList.remove("hidden");
+
+    document.body.style.overflow = "hidden";
+  }
+
+  function enableJoinBtnAsGotoWait(){
+    if (!homeJoinBtn) return;
+
+    // 「参加中」のときだけ “押せる” にする
+    const isJoining = (homeJoinBtn.textContent || "").includes("参加中");
+    if (!isJoining) return;
+
+    // disabledを解除して、クリックを待機へ
+    homeJoinBtn.disabled = false;
+    homeJoinBtn.style.cursor = "pointer";
+    homeJoinBtn.title = "待機画面を開く";
+
+    // 二重登録防止
+    if (homeJoinBtn.dataset.gotoWaitBound === "1") return;
+    homeJoinBtn.dataset.gotoWaitBound = "1";
+
+    homeJoinBtn.addEventListener("click", (e) => {
+      // 参加中なら待機へ
+      gotoWaitScreen();
+    });
+  }
+
+  // homeJoinBtnの状態変化を監視（参加→参加中に変わった瞬間にも対応）
+  if (homeJoinBtn) {
+    const moBtn = new MutationObserver(enableJoinBtnAsGotoWait);
+    moBtn.observe(homeJoinBtn, { attributes:true, attributeFilter:["disabled"], childList:true, subtree:true });
+    // 初回も試す
+    enableJoinBtnAsGotoWait();
+  }
+
+  // ====== ② 背景動画：PC mad.mp4 / スマホ mad1.mp4 ======
+  const bgVideo = $("#bgVideo");
+  const PC_SRC = "mad.mp4";
+  const MOB_SRC = "mad1.mp4";
+
+  function isMobile(){
+    // 画面幅 + ユーザー環境を軽く判定（どっちか当たればスマホ扱い）
+    return matchMedia("(max-width: 720px)").matches ||
+           (navigator.userAgent && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
+  }
+
+  async function swapBgVideoIfNeeded(){
+    if (!bgVideo) return;
+
+    const target = isMobile() ? MOB_SRC : PC_SRC;
+
+    // すでに同じなら何もしない
+    const current = (bgVideo.getAttribute("src") || bgVideo.src || "");
+    if (current.includes(target)) return;
+
+    // 再生位置をできるだけ維持
+    const t = bgVideo.currentTime || 0;
+    const wasPaused = bgVideo.paused;
+
+    try{
+      bgVideo.src = target;
+      bgVideo.load();
+
+      // metadata待ち（短め）
+      await new Promise((res) => {
+        const to = setTimeout(res, 400);
+        bgVideo.onloadedmetadata = () => { clearTimeout(to); res(); };
+      });
+
+      // 同じ時間に合わせる（できる範囲で）
+      try { bgVideo.currentTime = Math.min(t, (bgVideo.duration||t)); } catch(_){}
+
+      if (!wasPaused) {
+        bgVideo.play().catch(()=>{});
+      }
+    }catch(_){}
+  }
+
+  // 背景動画は「開始後」に既存moduleが src を入れるので、
+  // bgVideoのsrcが入ったタイミングを監視して差し替える
+  if (bgVideo) {
+    const moVid = new MutationObserver(() => swapBgVideoIfNeeded());
+    moVid.observe(bgVideo, { attributes:true, attributeFilter:["src"] });
+    // 念のため periodic でも1回だけ（開始直後のレース対策）
+    setTimeout(swapBgVideoIfNeeded, 1200);
+  }
+
+  // 端末回転/リサイズで切り替え（スマホ⇄PC幅のとき）
+  window.addEventListener("resize", () => {
+    // 負荷軽く：少し遅延
+    clearTimeout(window.__bgSwapTimer);
+    window.__bgSwapTimer = setTimeout(swapBgVideoIfNeeded, 180);
+  }, { passive:true });
+
+})();
+</script>
 </body>
 </html>
