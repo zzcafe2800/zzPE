@@ -1949,5 +1949,43 @@
 
 })();
 </script>
+
+<script>
+(() => {
+  const prev = document.getElementById("carPrev");
+  const next = document.getElementById("carNext");
+  const dots = document.getElementById("carDots");
+  if (!prev || !next) return;
+
+  // PCでボタンが効かない原因になりやすい「viewportのpointerdown」へイベントが流れないよう止める
+  const stop = (e) => {
+    e.stopPropagation();
+    // スワイプ判定用の pointer capture を奪われないように（保険）
+    try { e.target.releasePointerCapture?.(e.pointerId); } catch(_) {}
+  };
+
+  ["pointerdown","pointerup","pointermove","mousedown","mouseup","mousemove","touchstart","touchend"].forEach(type => {
+    prev.addEventListener(type, stop, { passive: true });
+    next.addEventListener(type, stop, { passive: true });
+  });
+
+  // dots も同様（PCでクリックが抜ける場合がある）
+  if (dots){
+    ["pointerdown","mousedown","touchstart"].forEach(type => {
+      dots.addEventListener(type, (e)=>e.stopPropagation(), { passive:true });
+    });
+  }
+
+  // 念のため：ボタンが上に来るように
+  const style = document.createElement("style");
+  style.textContent = `
+    .navBtn{ pointer-events:auto !important; z-index:9999 !important; }
+    .dots{ pointer-events:auto !important; z-index:9998 !important; }
+  `;
+  document.head.appendChild(style);
+})();
+</script>
+
+  
 </body>
 </html>
