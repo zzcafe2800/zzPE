@@ -752,9 +752,10 @@
       preloadAudio: [],
     },
     detailImages: [
-      // ここにURLを追加するだけ
-      // "https://example.com/detail1.png",
-      // "https://raw.githubusercontent.com/USER/REPO/main/detail2.png",
+   "https://raw.githubusercontent.com/zzcafe2800/zzPE/main/d1.png",
+       "https://raw.githubusercontent.com/zzcafe2800/zzPE/main/d2.png",
+   "https://raw.githubusercontent.com/zzcafe2800/zzPE/main/d3.png",
+      "https://raw.githubusercontent.com/zzcafe2800/zzPE/main/d4.png"
     ],
     credits: [
       "制作：gogh非公式（ファン活動） ",
@@ -1637,23 +1638,22 @@
 
     const w = window.innerWidth, h = window.innerHeight;
 
-    // ✅ 既存と同帯
+
     const r = 6 + Math.random() * 18;
 
-    // ✅ 全幅にばらける（詰まり防止）
+  
     const x = Math.random() * w;
 
-    // ✅ 下から少しだけ
+    
     const y = h + r + Math.random() * 40;
 
-    // ✅ 速度：炭酸っぽく速いが、埋め尽くさない
+   
     const spd = 260 + Math.random() * 420;
 
-    // ✅ ゆらぎは控えめ（背景を邪魔しない）
     const amp = 8 + Math.random() * 14;
     const wob = 1.0 + Math.random() * 1.2;
 
-    // ✅ 透明度を落として背景が見えるように
+   
     const alpha = 0.08 + Math.random() * 0.12;
 
     bubbles.push({ x, y, r, spd, amp, wob, phase: Math.random()*Math.PI*2, life: 0, alpha });
@@ -1662,7 +1662,7 @@
   function draw(b, globalFade){
     const a = b.alpha * globalFade;
 
-    // 塗りを薄く、輪郭も薄く（目立ちすぎ防止）
+
     const g = ctx.createRadialGradient(
       b.x - b.r*0.35, b.y - b.r*0.35, b.r*0.2,
       b.x, b.y, b.r
@@ -1711,7 +1711,7 @@
       const elapsed = t - startMs;
       const p = Math.max(0, Math.min(1, elapsed / durationMs)); // 0..1
 
-      // ✅ 生成は最初のSPAWN_WINDOW_MSだけ
+      
       if (elapsed < SPAWN_WINDOW_MS) {
         // 初動だけ少し多め → すぐ落ち着く（隙間残す）
         const k = 1 - (elapsed / SPAWN_WINDOW_MS); // 1→0
@@ -1719,7 +1719,6 @@
         for (let i=0;i<perFrame;i++) spawn();
       }
 
-      // ✅ “突然消え”防止：最後30%でゆっくり薄くする（泡は自然に画面外へ）
       const globalFade = (p < 0.70) ? 1 : (1 - (p - 0.70) / 0.30);
 
       // canvasも同様にゆっくり
@@ -1737,7 +1736,7 @@
 
         draw(b, globalFade * local);
 
-        // ✅ 自然に抜ける（突然全削除しない）
+        // 
         if (b.y < -b.r - 60 || b.x < -120 || b.x > w + 120){
           bubbles.splice(i,1);
         }
