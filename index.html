@@ -2,1990 +2,664 @@
 <html lang="ja">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-  <meta name="theme-color" content="#7fd3ff" />
-  <title>第３回フォトイベント『青空編』</title>
-
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Photo Event Simple</title>
   <style>
     :root{
-      --sky:#7fd3ff;
-      --sky2:#bfeaff;
-      --txt:#f7fbff;
-      --muted:rgba(247,251,255,.72);
-      --muted2:rgba(247,251,255,.52);
-      --shadowText: 0 10px 28px rgba(0,0,0,.60), 0 0 18px rgba(127,211,255,.18);
-      --safeTop: env(safe-area-inset-top, 0px);
-      --safeBot: env(safe-area-inset-bottom, 0px);
-      --serif: "Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP","MS Mincho",serif;
-      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Hiragino Kaku Gothic ProN","Noto Sans JP","Yu Gothic","Meiryo",sans-serif;
-      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      --bg1:#89ccff;
+      --bg2:#dff3ff;
+      --ink:#2f5672;
+      --ink2:#527a98;
+      --white:rgba(255,255,255,.78);
+      --line:rgba(255,255,255,.45);
+      --shadow:0 16px 40px rgba(68,118,152,.16);
+      --font:ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
     }
-
     *{box-sizing:border-box}
-    html,body{height:100%;margin:0;background:#000;color:var(--txt);font-family:var(--sans);overflow:hidden}
-    button{font-family:inherit}
-    .hidden{display:none !important}
-    .no-select{user-select:none;-webkit-user-select:none}
+    html,body{height:100%;margin:0}
+    body{font-family:var(--font);background:linear-gradient(180deg,var(--bg1),var(--bg2));overflow:hidden;color:var(--ink)}
+    button,input{font:inherit}
+    button{cursor:pointer;border:none}
 
-    /* ===== App root ===== */
-    #app{position:relative;min-height:100%;}
+    .app{position:relative;width:100%;height:100vh;overflow:hidden;background:linear-gradient(180deg,var(--bg1),var(--bg2))}
+    .bg-media{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.22;pointer-events:none}
+    .bg-overlay{position:absolute;inset:0;background:radial-gradient(circle at 20% 20%,rgba(255,255,255,.45),transparent 18%),radial-gradient(circle at 80% 15%,rgba(255,255,255,.3),transparent 14%),linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.18));pointer-events:none}
 
-    /* ===== Background video ===== */
-    #bgVideo{
-      position:fixed; inset:0;
-      width:100%; height:100%;
-      object-fit:cover;
-      z-index:0;
-      opacity:1;
-      pointer-events:none;
-      filter: contrast(1.05) saturate(1.08) brightness(.95);
-      transform: translateZ(0);
-    }
+    .topbar{position:absolute;left:0;right:0;top:0;z-index:20;padding:14px 16px 0}
+    .schedule-wrap{width:min(1200px,100%);margin:0 auto;background:rgba(255,255,255,.34);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:26px;padding:16px 18px 18px;box-shadow:var(--shadow)}
+    .schedule-title{text-align:center;font-size:13px;letter-spacing:.16em;color:var(--ink2);margin-bottom:10px}
+    .schedule-line{position:relative;height:10px;border-radius:999px;background:rgba(255,255,255,.5);overflow:hidden}
+    .schedule-fill{position:absolute;left:0;top:0;bottom:0;width:100%;background:linear-gradient(90deg,#7ad8ff 0%,#99f0c6 50%,#ffd88f 100%)}
+    .schedule-points{display:grid;grid-template-columns:1.2fr 1fr 1fr 1fr .9fr;gap:12px;margin-top:12px;align-items:start}
+    .schedule-step{text-align:center}
+    .schedule-step h3{margin:0;font-size:16px;font-weight:700;color:var(--ink)}
+    .schedule-step p{margin:6px 0 0;font-size:12px;line-height:1.5;color:var(--ink2)}
 
-    /* ===== Black veil: 6s solid black, then 5s fade out ===== */
-    #veil{
-      position:fixed; inset:0;
-      background:#000;
-      z-index:1;
-      opacity:1;
-      pointer-events:none;
-      transition: opacity 5000ms ease;
-    }
-    #veil.fade{ opacity:0; }
+    .view{position:absolute;left:0;right:0;top:116px;bottom:92px;padding:12px 16px}
+    .panel{display:none;width:min(1200px,100%);height:100%;margin:0 auto;background:rgba(255,255,255,.36);backdrop-filter:blur(10px);border:1px solid var(--line);border-radius:30px;box-shadow:var(--shadow);overflow:hidden}
+    .panel.active{display:block}
+    .panel-inner{height:100%;overflow:auto;padding:22px}
+    .panel-title{text-align:center;font-size:28px;letter-spacing:.12em;color:var(--ink);margin:6px 0 22px}
 
-    /* ===== Frost overlay (Home以外は “青+ぼかし” ) ===== */
-    #frost{
-      position:fixed; inset:0;
-      z-index:2;
-      pointer-events:none;
-      opacity:0;
-      transition: opacity 220ms ease;
-      background: rgba(127,211,255,.12);
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-    }
-    #app.frost-on #frost{ opacity:1; }
+    .map-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+    .map-card{background:rgba(255,255,255,.5);border-radius:24px;padding:14px;box-shadow:0 10px 24px rgba(90,136,168,.12)}
+    .map-thumb{width:100%;aspect-ratio:16/10;border-radius:18px;background:rgba(255,255,255,.6);display:grid;place-items:center;overflow:hidden}
+    .map-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+    .map-fallback{color:var(--ink2);font-size:13px;letter-spacing:.08em}
+    .map-name{text-align:center;margin-top:12px;font-size:18px;color:var(--ink)}
+    .map-id{text-align:center;margin-top:6px;font-size:15px;color:var(--ink2);letter-spacing:.08em}
 
-    /* ===== Top controls (direct overlay, not card) ===== */
-    #topControls{
-      position:fixed;
-      left:0; right:0;
-      top:0;
-      z-index:60;
-      padding: calc(10px + var(--safeTop)) 14px 10px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      pointer-events:none;
-    }
-    .volWrap{
-      pointer-events:auto;
-      display:flex;
-      align-items:center;
-      gap:10px;
-    }
-    .volIcon{
-      width:18px;height:18px; opacity:.92;
-      filter: drop-shadow(0 8px 18px rgba(0,0,0,.35));
-    }
-    input[type="range"]{
-      -webkit-appearance:none; appearance:none;
-      width:160px;
-      height:6px;
-      border-radius:999px;
-      outline:none;
-      background: linear-gradient(90deg, rgba(127,211,255,.95), rgba(191,234,255,.92));
-      opacity:.95;
-    }
-    input[type="range"]::-webkit-slider-thumb{
-      -webkit-appearance:none; appearance:none;
-      width:18px;height:18px;border-radius:50%;
-      background: rgba(247,251,255,.92);
-      border:1px solid rgba(255,255,255,.22);
-      box-shadow: 0 12px 20px rgba(0,0,0,.45);
-      cursor:pointer;
-    }
-    #statusText{
-      pointer-events:none;
-      font-size:12px;
-      letter-spacing:.05em;
-      color: rgba(247,251,255,.88);
-      text-shadow: var(--shadowText);
-      white-space:nowrap;
-    }
+    .home-wrap{position:relative;min-height:100%}
+    .home-main{display:grid;place-items:center;min-height:calc(100% - 20px);padding:30px 20px 90px;text-align:center}
+    .home-card{width:min(560px,100%);background:rgba(255,255,255,.5);border-radius:28px;padding:28px 24px;box-shadow:0 10px 24px rgba(90,136,168,.12)}
+    .home-card h3{margin:0 0 10px;font-size:28px;color:var(--ink)}
+    .home-card p{margin:0;font-size:16px;line-height:1.8;color:var(--ink2)}
+    .best-btn{position:absolute;right:18px;bottom:18px;padding:14px 18px;border-radius:999px;background:#111;color:#fff;box-shadow:0 12px 26px rgba(0,0,0,.18)}
 
-    /* ===== Credits (avoid overlap) ===== */
-    #creditBtn{
-      position:fixed;
-      right:14px;
-      bottom: calc(12px + var(--safeBot));
-      z-index:65;
-      font-size:12px;
-      letter-spacing:.06em;
-      color: rgba(247,251,255,.52);
-      text-shadow: var(--shadowText);
-      cursor:pointer;
-      user-select:none;
-      opacity:.85;
-    }
-    #creditBtn:hover{ opacity:1; }
+    .edit-wrap{display:grid;grid-template-columns:320px 1fr;gap:18px;height:100%;align-items:stretch}
+    .edit-tools,.edit-stage{background:rgba(255,255,255,.46);border-radius:26px;box-shadow:0 10px 24px rgba(90,136,168,.12)}
+    .edit-tools{padding:18px;overflow:auto;display:flex;flex-direction:column;gap:16px}
+    .edit-stage{position:relative;overflow:hidden;display:grid;place-items:center;padding:18px 18px 82px;min-height:460px}
+    .tool-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:16px}
+    .tool-tab{height:56px;border-radius:18px;background:rgba(255,255,255,.75);color:var(--ink);font-size:24px;display:grid;place-items:center;position:relative;overflow:visible}
+    .tool-tab.active{background:#fff;box-shadow:0 8px 20px rgba(90,136,168,.12)}
+    .tool-section{display:none;gap:14px;background:rgba(255,255,255,.4);border-radius:22px;padding:16px}
+    .tool-section.active{display:grid}
+    .tool-title{text-align:center;font-size:22px;color:var(--ink);letter-spacing:.12em}
+    .tool-row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+    .tool-row button,.tool-row label,.save-btn,.preset-btn{border-radius:999px;background:rgba(255,255,255,.82);padding:12px 16px;color:var(--ink)}
+    .tool-row input{display:none}
+    .slider-stack{display:grid;gap:14px}
+    .slider-stack label{display:grid;gap:8px;color:var(--ink2)}
+    .slider-stack input[type="range"]{width:100%}
+    .stamp-palette{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+    .stamp-btn{background:rgba(255,255,255,.82);border-radius:18px;padding:8px;display:grid;place-items:center;min-height:84px;color:var(--ink2)}
+    .stamp-btn img{max-width:100%;max-height:68px;display:block}
+    .save-btn{background:rgba(121,240,187,.42)}
+    .save-floating{position:absolute;left:18px;bottom:18px;z-index:10}
+    .icon-tip{position:absolute;left:50%;top:calc(100% + 8px);transform:translateX(-50%);background:rgba(47,86,114,.94);color:#fff;border-radius:999px;padding:6px 10px;font-size:11px;letter-spacing:.08em;opacity:0;pointer-events:none;white-space:nowrap;transition:opacity .2s ease;z-index:20}
+    .tool-tab:hover .icon-tip{opacity:1}
 
-    /* ===== Screens base ===== */
-    .screen{
-      position:fixed; inset:0;
-      z-index:10;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      padding: calc(52px + var(--safeTop)) 16px calc(22px + var(--safeBot));
-      overflow:auto;
-    }
+    .canvas-wrap{position:relative;width:100%;height:100%;border-radius:22px;overflow:hidden;background:rgba(255,255,255,.42);display:grid;place-items:center;-webkit-user-drag:none;user-select:none;touch-action:none}
+    .canvas-wrap.grab-mode{cursor:grab}
+    .canvas-wrap.grabbing{cursor:grabbing}
+    .edit-image{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;max-width:none;max-height:none;-webkit-user-drag:none;user-select:none;pointer-events:none}
+    .edit-stage.has-image .edit-image{display:block}
+    .edit-placeholder{color:var(--ink2);font-size:16px;line-height:1.8;text-align:center;padding:24px}
+    .edit-stage.has-image .edit-placeholder{display:none}
+    .blur-mask{position:absolute;inset:0;pointer-events:none;backdrop-filter:blur(0px);mask-image:none;-webkit-mask-image:none}
+    .blur-ring{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);border-radius:50%;pointer-events:none;border:2px solid rgba(255,255,255,.9)}
+    .stamp-layer{position:absolute;inset:0;pointer-events:none}
+    .stamp-item{position:absolute;left:50%;top:50%;width:120px;pointer-events:auto;touch-action:none;user-select:none}
+    .stamp-item.active{outline:2px solid rgba(121,240,187,.95);outline-offset:4px;border-radius:12px}
 
-    /* ===== Loader: 水色背景に直接載せる ===== */
-    #loaderScreen{
-      background: linear-gradient(180deg, rgba(127,211,255,1), rgba(127,211,255,.92));
-      z-index:200;
-      flex-direction:column;
-      gap:14px;
-      text-align:center;
-      padding-top: calc(64px + var(--safeTop));
-    }
-    #loadGif{
-      width: 120px;
-      height: 120px;
-      object-fit:contain;
-      display:block;
-      margin: 0 auto;
-      image-rendering:auto;
-      filter: drop-shadow(0 18px 26px rgba(0,0,0,.25));
-    }
-    #loadingText{
-      font-size: 14px;
-      letter-spacing:.05em;
-      color: rgba(10,18,26,.78);
-      font-weight:700;
-    }
-    #tapHint{
-      font-size: 12px;
-      letter-spacing:.10em;
-      color: rgba(10,18,26,.55);
-      font-weight:800;
-    }
-    .barOuter{
-      width: 240px;
-      height: 16px;
-      border-radius: 6px;
-      background: rgba(0,0,0,.12);
-      overflow:hidden;
-      box-shadow: 0 10px 18px rgba(0,0,0,.12) inset;
-    }
-    .barFill{
-      width:0%;
-      height:100%;
-      background: rgba(255,255,255,.85);
-      transition: width 220ms ease;
-    }
+    .bottom-nav{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);display:flex;gap:28px;z-index:25}
+    .nav-btn{background:transparent;color:rgba(47,86,114,.55);display:flex;flex-direction:column;align-items:center;gap:6px}
+    .nav-btn.active{color:var(--ink)}
+    .nav-ico{font-size:30px;line-height:1}
+    .nav-label{font-size:11px;letter-spacing:.12em}
 
-    /* ===== Home (超シンプル) ===== */
-    #homeScreen{ z-index:20; }
-    .homeWrap{
-      width:min(980px, 100%);
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:center;
-      text-align:center;
-      gap: 12px;
+    @media (max-width:900px){
+      .schedule-points{grid-template-columns:1fr 1fr;row-gap:14px}
+      .view{top:154px}
+      .map-grid{grid-template-columns:1fr}
+      .edit-wrap{grid-template-columns:1fr}
+      .stamp-palette{grid-template-columns:repeat(2,1fr)}
+      .bottom-nav{gap:18px}
     }
-    #homeTitle{
-      font-family: var(--serif);
-      font-weight: 600;
-      letter-spacing:.06em;
-      line-height:1.15;
-      font-size: clamp(30px, 4.6vw, 54px);
-      margin: 0;
-      text-shadow: var(--shadowText);
-    }
-    #homeSub{
-      margin: 0;
-      font-size: 13px;
-      letter-spacing:.04em;
-      color: rgba(247,251,255,.86);
-      text-shadow: var(--shadowText);
-    }
-
-    /* Title bubble float-in (keep, no extra UI) */
-    .titleLetters{display:inline-block; white-space:pre-wrap}
-    .letter{
-      display:inline-block;
-      opacity:0;
-      filter: blur(18px);
-      transform: translateY(64px) rotate(var(--rot, 0deg));
-      will-change: transform, opacity, filter;
-      position:relative;
-      color: rgba(247,251,255,.96);
-      text-shadow: var(--shadowText);
-    }
-    @keyframes floatIn{
-      0%{opacity:0;filter:blur(18px);transform:translate3d(calc(var(--sx,0px)*1.0),70px,0) rotate(var(--rot,0deg));}
-      55%{opacity:1;filter:blur(6px);transform:translate3d(calc(var(--sx,0px)*.6),12px,0) rotate(calc(var(--rot,0deg)*.35));}
-      85%{filter:blur(1.6px);transform:translate3d(calc(var(--sx,0px)*.25),-2px,0) rotate(calc(var(--rot,0deg)*.12));}
-      100%{opacity:1;filter:blur(0px);transform:translate3d(0,0,0) rotate(0deg);}
-    }
-    @keyframes shimmerHold{
-      0%,100%{ text-shadow: var(--shadowText); }
-      50%{ text-shadow: 0 10px 28px rgba(0,0,0,.60), 0 0 26px rgba(127,211,255,.26); }
-    }
-    .letter.hold{ animation: shimmerHold 5200ms ease-in-out infinite; }
-
-    /* Bubble canvas behind title only */
-    #bubbleCanvas{
-      position:fixed;
-      inset:0;
-      z-index:19;
-      pointer-events:none;
-      opacity:.75;
-      filter: drop-shadow(0 12px 26px rgba(0,0,0,.35));
-    }
-
-    /* Home buttons (only 2, minimal) */
-    .homeBtns{
-      margin-top: 10px;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      gap: 18px;
-      flex-wrap:wrap;
-    }
-    #homeJoinBtn{
-      height:54px;
-      min-width: 220px;
-      padding: 0 22px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,.22);
-      background: rgba(0,0,0,.28);
-      color: rgba(247,251,255,.96);
-      font-weight: 850;
-      letter-spacing:.10em;
-      cursor:pointer;
-      text-shadow: var(--shadowText);
-      box-shadow: 0 18px 40px rgba(0,0,0,.35);
-    }
-    #homeJoinBtn:hover{ filter: brightness(1.08); }
-    #homeJoinBtn:active{ transform: translateY(1px); }
-    #homeJoinBtn[disabled]{ opacity:.55; cursor:not-allowed; }
-
-    #homeDetailsBtn{
-      border: none;
-      background: transparent;
-      color: rgba(247,251,255,.92);
-      font-weight: 800;
-      letter-spacing:.10em;
-      cursor:pointer;
-      text-shadow: var(--shadowText);
-      padding: 10px 8px;
-      text-decoration: underline;
-      text-underline-offset: 6px;
-      opacity:.92;
-    }
-    #homeDetailsBtn:hover{ opacity:1; }
-    #homeDetailsBtn:active{ transform: translateY(1px); }
-
-    /* ===== Simple header row (no card) ===== */
-    .simpleTopRow{
-      width:min(920px, 100%);
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:12px;
-      margin-bottom: 12px;
-    }
-    .simpleTitle{
-      margin:0;
-      font-family: var(--serif);
-      letter-spacing:.06em;
-      font-size: 20px;
-      text-shadow: var(--shadowText);
-    }
-    .backBtn{
-      height: 44px;
-      padding: 0 16px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,.18);
-      background: rgba(0,0,0,.26);
-      color: rgba(247,251,255,.95);
-      font-weight: 800;
-      letter-spacing:.08em;
-      cursor:pointer;
-      text-shadow: var(--shadowText);
-    }
-    .backBtn:hover{ filter: brightness(1.08); }
-    .backBtn:active{ transform: translateY(1px); }
-
-    /* ===== Details: only image + dots + <> + title/back ===== */
-    .detailsWrap{
-      width:min(920px, 100%);
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:center;
-    }
-    .carousel{
-      width:100%;
-      border-radius: 18px;
-      overflow:hidden;
-      border:1px solid rgba(255,255,255,.14);
-      background: rgba(127,211,255,.10);
-      box-shadow: 0 18px 44px rgba(0,0,0,.32);
-      position:relative;
-    }
-    .viewport{
-      width:100%;
-      aspect-ratio: 16/10;
-      max-height: 68vh;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      background: rgba(127,211,255,.12);
-    }
-    .viewport img{
-      width:100%; height:100%;
-      object-fit: contain;
-      background: rgba(127,211,255,.10);
-    }
-    .navBtn{
-      position:absolute;
-      top:50%;
-      transform: translateY(-50%);
-      width: 44px; height:44px;
-      border-radius:999px;
-      border:1px solid rgba(255,255,255,.18);
-      background: rgba(0,0,0,.30);
-      color: rgba(247,251,255,.95);
-      cursor:pointer;
-      box-shadow: 0 14px 26px rgba(0,0,0,.34);
-    }
-    .navBtn:hover{ filter: brightness(1.08); }
-    .navBtn:active{ transform: translateY(-50%) scale(.98); }
-    .navBtn.left{ left: 12px; }
-    .navBtn.right{ right: 12px; }
-
-    .dots{
-      position:absolute;
-      left:50%;
-      bottom: 12px;
-      transform: translateX(-50%);
-      display:flex;
-      gap:8px;
-      padding: 10px 12px;
-      border-radius: 999px;
-      border:1px solid rgba(255,255,255,.12);
-      background: rgba(0,0,0,.26);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-    .dot{
-      width:8px;height:8px;border-radius:50%;
-      background: rgba(247,251,255,.38);
-      border:1px solid rgba(255,255,255,.12);
-      cursor:pointer;
-      transition: transform 160ms ease, background 160ms ease;
-    }
-    .dot.on{ background: rgba(191,234,255,.88); transform: scale(1.18); }
-
-    /* ===== Join: center content, minimal rows + fixed bottom-right join button ===== */
-    .joinWrap{
-      width:min(920px, 100%);
-      display:flex;
-      flex-direction:column;
-      align-items:center;
-      justify-content:center;
-      gap: 10px;
-      position:relative;
-      padding-bottom: 84px; /* room for fixed button */
-    }
-    .sessionList{
-      width:100%;
-      display:flex;
-      flex-direction:column;
-      gap:10px;
-    }
-    .sessionRow{
-      width:100%;
-      border:1px solid rgba(255,255,255,.14);
-      border-radius: 18px;
-      background: rgba(0,0,0,.22);
-      padding: 14px 16px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap: 12px;
-      cursor:pointer;
-      box-shadow: 0 16px 36px rgba(0,0,0,.26);
-    }
-    .sessionRow:hover{ filter: brightness(1.06); }
-    .sessionRow.on{
-      border-color: rgba(191,234,255,.35);
-      background: rgba(127,211,255,.16);
-    }
-    .sessionMain{
-      display:flex;
-      flex-direction:column;
-      gap:6px;
-    }
-    .sessionName{
-      margin:0;
-      font-family: var(--serif);
-      letter-spacing:.06em;
-      font-size: 18px;
-      text-shadow: var(--shadowText);
-    }
-    .sessionNow{
-      font-size: 13px;
-      letter-spacing:.05em;
-      color: rgba(247,251,255,.86);
-      text-shadow: var(--shadowText);
-    }
-    .sessionNote{
-      font-size:12px;
-      letter-spacing:.04em;
-      color: rgba(247,251,255,.78);
-      text-shadow: var(--shadowText);
-      margin-top: 6px;
-    }
-
-    #joinConfirmBtn{
-      position:fixed;
-      right: 14px;
-      bottom: calc(14px + var(--safeBot));
-      z-index:80;
-      height: 54px;
-      padding: 0 22px;
-      border-radius: 999px;
-      border: 1px solid rgba(255,255,255,.20);
-      background: rgba(0,0,0,.34);
-      color: rgba(247,251,255,.96);
-      font-weight: 900;
-      letter-spacing:.10em;
-      cursor:pointer;
-      box-shadow: 0 20px 46px rgba(0,0,0,.40);
-      text-shadow: var(--shadowText);
-    }
-    #joinConfirmBtn:hover{ filter: brightness(1.08); }
-    #joinConfirmBtn:active{ transform: translateY(1px); }
-    #joinConfirmBtn[disabled]{ opacity:.55; cursor:not-allowed; }
-
-    /* ===== Wait: card only (center), big headline, then "土曜/21:00〜" line, then description, bottom-right cancel ===== */
-    .waitWrap{
-      width:min(680px, 100%);
-      display:flex;
-      align-items:center;
-      justify-content:center;
-    }
-    .waitCard{
-      width:100%;
-      border-radius: 22px;
-      border:1px solid rgba(255,255,255,.14);
-      background: rgba(0,0,0,.28);
-      box-shadow: 0 24px 64px rgba(0,0,0,.40);
-      padding: 18px 18px 70px;
-      position:relative;
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
-    }
-    #waitHeadline{
-      margin: 2px 0 8px;
-      font-family: var(--serif);
-      font-size: 22px;
-      letter-spacing:.06em;
-      text-shadow: var(--shadowText);
-    }
-    #waitWhen{
-      margin: 0 0 14px;
-      font-size: 14px;
-      letter-spacing:.05em;
-      color: rgba(247,251,255,.90);
-      text-shadow: var(--shadowText);
-    }
-    #waitDesc{
-      margin:0;
-      font-size: 15px;
-      line-height:1.7;
-      letter-spacing:.03em;
-      color: rgba(247,251,255,.92);
-      text-shadow: var(--shadowText);
-    }
-    #leaveBtn{
-      position:absolute;
-      right: 14px;
-      bottom: 14px;
-      height: 48px;
-      padding: 0 18px;
-      border-radius: 999px;
-      border:1px solid rgba(255,255,255,.18);
-      background: rgba(0,0,0,.30);
-      color: rgba(247,251,255,.95);
-      font-weight: 900;
-      letter-spacing:.10em;
-      cursor:pointer;
-      box-shadow: 0 16px 36px rgba(0,0,0,.35);
-      text-shadow: var(--shadowText);
-    }
-    #leaveBtn:hover{ filter: brightness(1.08); }
-    #leaveBtn:active{ transform: translateY(1px); }
-
-    /* ===== Toast ===== */
-    #toast{
-      position:fixed;
-      left:50%;
-      bottom: calc(78px + var(--safeBot));
-      transform: translateX(-50%);
-      z-index:500;
-      padding: 12px 14px;
-      border-radius: 999px;
-      border:1px solid rgba(255,255,255,.14);
-      background: rgba(0,0,0,.32);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
-      color: rgba(247,251,255,.92);
-      font-size: 13px;
-      letter-spacing:.03em;
-      box-shadow: 0 18px 40px rgba(0,0,0,.36);
-      opacity:0;
-      pointer-events:none;
-      transition: opacity 180ms ease, transform 180ms ease;
-      text-shadow: var(--shadowText);
-      white-space:nowrap;
-    }
-    #toast.on{ opacity:1; transform: translateX(-50%) translateY(-4px); }
-
-    /* ===== Credits modal ===== */
-    #creditModal{
-      position:fixed; inset:0;
-      z-index:300;
-      display:none;
-      align-items:center;
-      justify-content:center;
-      padding: 16px;
-      background: rgba(0,0,0,.55);
-      backdrop-filter: blur(6px);
-      -webkit-backdrop-filter: blur(6px);
-    }
-    #creditModal.on{ display:flex; }
-    .modalCard{
-      width:min(560px, 100%);
-      border-radius: 22px;
-      border:1px solid rgba(255,255,255,.14);
-      background: rgba(0,0,0,.40);
-      box-shadow: 0 22px 60px rgba(0,0,0,.46);
-      padding: 16px;
-    }
-    .modalCard h3{
-      margin: 0 0 8px;
-      font-family: var(--serif);
-      letter-spacing:.06em;
-      text-shadow: var(--shadowText);
-    }
-    .modalCard pre{
-      margin: 10px 0 0;
-      padding: 12px;
-      border-radius: 14px;
-      background: rgba(0,0,0,.30);
-      border:1px solid rgba(255,255,255,.10);
-      color: rgba(247,251,255,.86);
-      font-family: var(--mono);
-      font-size: 12px;
-      line-height:1.55;
-      white-space:pre-wrap;
-      word-break:break-word;
-    }
-    .modalActions{ display:flex; justify-content:flex-end; margin-top: 12px; }
   </style>
 </head>
-
 <body>
-<div id="app" class="no-select">
-  <video id="bgVideo" playsinline muted loop preload="auto"></video>
-  <div id="veil"></div>
-  <div id="frost"></div>
+  <div class="app" id="app">
+    <video class="bg-media" id="bgVideo" autoplay muted loop playsinline>
+      <source src="mad.mp4" type="video/mp4">
+    </video>
+    <div class="bg-overlay"></div>
 
-  <!-- Top controls (homeでも表示) -->
-  <div id="topControls">
-    <div class="volWrap" title="サイト内の音量（BGM/効果音）">
-      <svg class="volIcon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-        <path d="M4 10v4c0 .55.45 1 1 1h3l4 3c.66.5 1.6.03 1.6-.8V6.8c0-.83-.94-1.3-1.6-.8l-4 3H5c-.55 0-1 .45-1 1Z" stroke="rgba(247,251,255,.92)" stroke-width="1.6" stroke-linejoin="round"/>
-        <path d="M16 9c1.2 1.2 1.2 4.8 0 6" stroke="rgba(191,234,255,.85)" stroke-width="1.6" stroke-linecap="round"/>
-        <path d="M18.5 6.5c2.4 2.4 2.4 8.6 0 11" stroke="rgba(127,211,255,.65)" stroke-width="1.6" stroke-linecap="round"/>
-      </svg>
-      <input id="volSlider" type="range" min="0" max="100" value="50" />
-    </div>
-    <div id="statusText">接続：準備中</div>
-  </div>
-
-  <div id="creditBtn" class="hidden">クレジット</div>
-
-  <!-- Loader (tap anywhere) -->
-  <section id="loaderScreen" class="screen">
-    <img id="loadGif" alt="loading" />
-    <div id="loadingText">ロード中</div>
-    <div class="barOuter" aria-hidden="true"><div id="progressFill" class="barFill"></div></div>
-    <div id="tapHint">タップで開始</div>
-  </section>
-
-  <!-- Bubble canvas (home only) -->
-  <canvas id="bubbleCanvas" class="hidden"></canvas>
-
-  <!-- HOME -->
-  <section id="homeScreen" class="screen hidden">
-    <div class="homeWrap">
-      <h1 id="homeTitle">
-        <span class="titleLetters" id="titleLetters"></span>
-      </h1>
-      <p id="homeSub">土曜 / 日曜　21:00〜22:00</p>
-
-      <div class="homeBtns">
-        <button id="homeJoinBtn">参加</button>
-        <button id="homeDetailsBtn">イベント詳細</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- DETAILS -->
-  <section id="detailsScreen" class="screen hidden">
-    <div class="detailsWrap">
-      <div class="simpleTopRow">
-        <h2 class="simpleTitle">イベント詳細</h2>
-        <button class="backBtn" id="backFromDetails">戻る</button>
-      </div>
-
-      <div class="carousel" id="carousel">
-        <div class="viewport" id="carViewport">
-          <img id="carImage" alt="detail image" />
-          <button class="navBtn left" id="carPrev" aria-label="前へ">‹</button>
-          <button class="navBtn right" id="carNext" aria-label="次へ">›</button>
-          <div class="dots" id="carDots" aria-label="ページ"></div>
+    <header class="topbar">
+      <div class="schedule-wrap">
+        <div class="schedule-title">今日の流れ</div>
+        <div class="schedule-line"><div class="schedule-fill"></div></div>
+        <div class="schedule-points">
+          <div class="schedule-step"><h3>21:00 集合</h3><p>全員で集合写真</p></div>
+          <div class="schedule-step"><h3>1マップ</h3><p>約25分<br>マップIDあり</p></div>
+          <div class="schedule-step"><h3>2マップ</h3><p>約25分<br>マップIDあり</p></div>
+          <div class="schedule-step"><h3>3マップ</h3><p>約20分<br>マップIDあり</p></div>
+          <div class="schedule-step"><h3>最後</h3><p>SNS投稿<br>#ベストフォト</p></div>
         </div>
       </div>
-    </div>
-  </section>
+    </header>
 
-  <!-- JOIN -->
-  <section id="joinScreen" class="screen hidden">
-    <div class="joinWrap">
-      <div class="simpleTopRow">
-        <h2 class="simpleTitle">参加予定にする</h2>
-        <button class="backBtn" id="backFromJoin">戻る</button>
-      </div>
+    <main class="view">
+      <section class="panel active" id="panelMap">
+        <div class="panel-inner">
+          <h2 class="panel-title">マップ</h2>
+          <div class="map-grid" id="mapGrid"></div>
+        </div>
+      </section>
 
-      <div class="sessionList">
-        <div class="sessionRow" id="rowSat" role="button" tabindex="0">
-          <div class="sessionMain">
-            <p class="sessionName">☀ 土曜(3/7) / 21:00</p>
-            <div class="sessionNow">現在：<span id="badgeSat">…</span></div>
+      <section class="panel" id="panelHome">
+        <div class="panel-inner home-wrap">
+          <h2 class="panel-title">ホーム</h2>
+          <div class="home-main">
+            <div class="home-card">
+              <h3>今日のイベント</h3>
+              <p>上のスケジュールを見ながら進行してください。<br>右下のボタンから #ベストフォト を付けて気軽に投稿できます。</p>
+            </div>
+          </div>
+          <button class="best-btn" id="bestPhotoBtn">#ベストフォト を投稿</button>
+        </div>
+      </section>
+
+      <section class="panel" id="panelEdit">
+        <div class="panel-inner">
+          <h2 class="panel-title">加工</h2>
+          <div class="edit-wrap">
+            <div class="edit-tools">
+              <div class="tool-tabs">
+                <button class="tool-tab active" data-tool="gallery">🖼<span class="icon-tip">ギャラリー</span></button>
+                <button class="tool-tab" data-tool="color">☼<span class="icon-tip">色合い</span></button>
+                <button class="tool-tab" data-tool="stamp">✦<span class="icon-tip">スタンプ</span></button>
+                <button class="tool-tab" data-tool="blur">◌<span class="icon-tip">ぼかし</span></button>
+              </div>
+
+              <div class="tool-section active" id="toolGallery">
+                <div class="tool-title">ギャラリー</div>
+                <div class="tool-row">
+                  <label>画像を選ぶ<input type="file" id="editFileInput" accept="image/*"></label>
+                  <button id="grabImageBtn">つかむ</button>
+                  <button id="resetPositionBtn">位置リセット</button>
+                </div>
+                <div class="tool-row">
+                  <button id="rotateBtn">回転</button>
+                  <button id="flipBtn">反転</button>
+                  <button id="zoomInBtn">拡大</button>
+                  <button id="zoomOutBtn">縮小</button>
+                  <button id="resetEditBtn">戻す</button>
+                </div>
+              </div>
+
+              <div class="tool-section" id="toolColor">
+                <div class="tool-title">色合い</div>
+                <div class="tool-row"><button class="preset-btn" id="youthPresetBtn">青春っぽく</button></div>
+                <div class="slider-stack">
+                  <label>明るさ<input type="range" id="brightnessRange" min="50" max="170" value="100"></label>
+                  <label>彩度<input type="range" id="saturationRange" min="50" max="200" value="100"></label>
+                  <label>青より<input type="range" id="coolRange" min="0" max="60" value="0"></label>
+                  <label>暖かさ<input type="range" id="warmthRange" min="-40" max="40" value="0"></label>
+                </div>
+              </div>
+
+              <div class="tool-section" id="toolStamp">
+                <div class="tool-title">スタンプ</div>
+                <div class="stamp-palette" id="stampPalette"></div>
+                <div class="slider-stack">
+                  <label>大きさ<input type="range" id="stampSizeRange" min="20" max="260" value="120"></label>
+                  <label>角度<input type="range" id="stampRotateRange" min="-180" max="180" value="0"></label>
+                </div>
+                <div class="tool-row"><button id="deleteStampBtn">選択スタンプ削除</button></div>
+              </div>
+
+              <div class="tool-section" id="toolBlur">
+                <div class="tool-title">ぼかし</div>
+                <div class="slider-stack">
+                  <label>円の大きさ<input type="range" id="blurRadiusRange" min="10" max="48" value="26"></label>
+                  <label>ぼかしの強さ<input type="range" id="blurStrengthRange" min="0" max="18" value="6"></label>
+                  <label>境目のやわらかさ<input type="range" id="blurFeatherRange" min="8" max="42" value="18"></label>
+                </div>
+              </div>
+
+              
+            </div>
+
+            <div class="edit-stage" id="editStage"><button class="save-btn save-floating" id="saveImageBtn">保存</button>
+              <div class="canvas-wrap" id="editCanvasWrap" draggable="false">
+                <img id="editPreview" class="edit-image" alt="編集プレビュー" draggable="false">
+                <div class="blur-mask" id="blurPreviewMask"></div>
+                <div class="blur-ring" id="blurFocusRing"></div>
+                <div class="stamp-layer" id="stampLayer"></div>
+                <div class="edit-placeholder" id="editPlaceholder">画像を読み込んで加工できます。<br>画像やスタンプが無くてもこのまま表示されます。</div>
+              </div>
+            </div>
           </div>
         </div>
+      </section>
+    </main>
 
-        <div class="sessionRow" id="rowSun" role="button" tabindex="0">
-          <div class="sessionMain">
-            <p class="sessionName">🌊 日曜(3/8)  / 21:00</p>
-            <div class="sessionNow">現在：<span id="badgeSun">…</span></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="sessionNote">各回 4〜10名ほどで開催予定です</div>
-    </div>
-
-    <button id="joinConfirmBtn" disabled>参加予定にする</button>
-  </section>
-
-  <!-- WAIT -->
-  <section id="waitScreen" class="screen hidden">
-    <div class="waitWrap">
-      <div class="waitCard">
-        <div class="simpleTopRow" style="margin:0 0 8px;">
-          <h2 class="simpleTitle">待機</h2>
-          <button class="backBtn" id="backFromWait">戻る</button>
-        </div>
-
-        <div id="waitHeadline">参加予定に追加しました🌤</div>
-        <div id="waitWhen">…</div>
-
-        <p id="waitDesc">
-          参加日の時間に再度開くと<br/>
-          このサイトが案内してくれます
-        </p>
-
-        <button id="leaveBtn">参加をやめる</button>
-      </div>
-    </div>
-  </section>
-
-  <!-- Toast -->
-  <div id="toast">…</div>
-
-  <!-- Credits modal -->
-  <div id="creditModal" role="dialog" aria-modal="true" aria-label="クレジット">
-    <div class="modalCard">
-      <h3>クレジット</h3>
-      <pre id="creditText"></pre>
-      <div class="modalActions">
-        <button class="backBtn" id="closeCredit">閉じる</button>
-      </div>
-    </div>
+    <nav class="bottom-nav">
+      <button class="nav-btn active" data-panel="map"><div class="nav-ico">🗺</div><div class="nav-label">マップ</div></button>
+      <button class="nav-btn" data-panel="home"><div class="nav-ico">⌂</div><div class="nav-label">ホーム</div></button>
+      <button class="nav-btn" data-panel="edit"><div class="nav-ico">✦</div><div class="nav-label">加工</div></button>
+    </nav>
   </div>
-</div>
 
-<script type="module">
-  /* =========================================================
-    ✅ 次回使い回し用：ここだけ基本触る
-  ========================================================= */
-  const CONFIG = {
-    eventTitle: "第３回フォトイベント『青空編』",
-    assets: {
-      loadGif: "load.gif",
-      bgVideo: "mad.mp4",
-      bgm: "ramune.mp3",
-      preloadImages: [],
-      preloadVideos: [],
-      preloadAudio: [],
-    },
-    detailImages: [
-   "https://raw.githubusercontent.com/zzcafe2800/zzPE/main/d1.png",
-       "https://raw.githubusercontent.com/zzcafe2800/zzPE/main/d2.png",
-   "https://raw.githubusercontent.com/zzcafe2800/zzPE/main/d3.png",
-      "https://raw.githubusercontent.com/zzcafe2800/zzPE/main/d4.png"
-    ],
-    credits: [
-      "制作：gogh非公式（ファン活動） ",
-      "音源：　　",
-      "背景: gogh",
-      "",
-    ].join("\\n"),
-    sessions: {
-      sat: { id:"sat_2100", label:"☀ 土曜 / 21:00", whenLine:"☀ 土曜 / 21:00〜", capacity:10, hardMax:16 },
-      sun: { id:"sun_2100", label:"🌊 日曜 / 21:00", whenLine:"🌊 日曜 / 21:00〜", capacity:10, hardMax:16 },
-    },
-    dbNames: {
-      sessionsCol: "event_sessions",
-      usersCol: "event_users",
-      participantsSub: "participants",
-    },
-    rangeLabel(count){
-      if (count <= 0) return "0";
-      if (count <= 3) return "1〜3";
-      if (count <= 6) return "4〜6";
-      if (count <= 9) return "7〜9";
-      return "10+";
-    },
-    isClosed(count, cap){ return count >= cap; }
-  };
-
-  /* =========================================================
-    Firebase
-  ========================================================= */
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-analytics.js";
-  import { getAuth, onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-auth.js";
-  import {
-    getFirestore, doc, getDoc, setDoc, runTransaction, serverTimestamp, onSnapshot
-  } from "https://www.gstatic.com/firebasejs/12.10.0/firebase-firestore.js";
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyCkKgYk6J5gSyawChzXySKsS9ndNku78wA",
-    authDomain: "zzpe-3da55.firebaseapp.com",
-    projectId: "zzpe-3da55",
-    storageBucket: "zzpe-3da55.firebasestorage.app",
-    messagingSenderId: "342215402250",
-    appId: "1:342215402250:web:ab23168eb33fc2a70810f3",
-    measurementId: "G-0814BNNY2E"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-
-  /* =========================================================
-    DOM helpers
-  ========================================================= */
-  const $ = (s)=>document.querySelector(s);
-
-  const appRoot = $("#app");
-  const bgVideo = $("#bgVideo");
-  const veil = $("#veil");
-  const frost = $("#frost");
-
-  const volSlider = $("#volSlider");
-  const statusText = $("#statusText");
-  const toast = $("#toast");
-
-  const creditBtn = $("#creditBtn");
-  const creditModal = $("#creditModal");
-  const creditText = $("#creditText");
-  const closeCredit = $("#closeCredit");
-
-  const loaderScreen = $("#loaderScreen");
-  const loadGif = $("#loadGif");
-  const loadingText = $("#loadingText");
-  const progressFill = $("#progressFill");
-
-  const bubbleCanvas = $("#bubbleCanvas");
-  const titleLetters = $("#titleLetters");
-
-  const homeScreen = $("#homeScreen");
-  const detailsScreen = $("#detailsScreen");
-  const joinScreen = $("#joinScreen");
-  const waitScreen = $("#waitScreen");
-
-  const homeJoinBtn = $("#homeJoinBtn");
-  const homeDetailsBtn = $("#homeDetailsBtn");
-
-  const backFromDetails = $("#backFromDetails");
-  const backFromJoin = $("#backFromJoin");
-  const backFromWait = $("#backFromWait");
-
-  const carImage = $("#carImage");
-  const carPrev = $("#carPrev");
-  const carNext = $("#carNext");
-  const carDots = $("#carDots");
-  const carViewport = $("#carViewport");
-
-  const rowSat = $("#rowSat");
-  const rowSun = $("#rowSun");
-  const badgeSat = $("#badgeSat");
-  const badgeSun = $("#badgeSun");
-  const joinConfirmBtn = $("#joinConfirmBtn");
-
-  const waitWhen = $("#waitWhen");
-  const leaveBtn = $("#leaveBtn");
-
-  /* =========================================================
-    Screen router + frost control
-  ========================================================= */
-  const Screens = { loader: loaderScreen, home: homeScreen, details: detailsScreen, join: joinScreen, wait: waitScreen };
-
-  function showScreen(name){
-    Object.values(Screens).forEach(el=>el.classList.add("hidden"));
-    Screens[name].classList.remove("hidden");
-
-    // Frost ON for details/join/wait only
-    const frostOn = (name === "details" || name === "join" || name === "wait");
-    appRoot.classList.toggle("frost-on", frostOn);
-
-    // Bubble canvas only on home
-    bubbleCanvas.classList.toggle("hidden", name !== "home");
-
-    // Credit button only after start (and keep away from top controls)
-    creditBtn.classList.toggle("hidden", name === "loader");
-
-    // allow scroll inside screens (fixed)
-    document.body.style.overflow = (name === "loader" || name === "home") ? "hidden" : "hidden";
-  }
-
-  /* =========================================================
-    Toast
-  ========================================================= */
-  let toastTimer = null;
-  function showToast(msg, ms=1700){
-    toast.textContent = msg;
-    toast.classList.add("on");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(()=>toast.classList.remove("on"), ms);
-  }
-
-  /* =========================================================
-    Loader text dots "ロード中…" animation
-  ========================================================= */
-  let dotsTimer = null;
-  function startDots(){
-    let n = 0;
-    loadingText.textContent = "ロード中";
-    clearInterval(dotsTimer);
-    dotsTimer = setInterval(()=>{
-      n = (n + 1) % 4;
-      loadingText.textContent = "ロード中" + ".".repeat(n);
-    }, 380);
-  }
-  function stopDots(){
-    clearInterval(dotsTimer);
-    dotsTimer = null;
-    loadingText.textContent = "ロード完了";
-  }
-
-  /* =========================================================
-    Audio: master + BGM ramp (0.20 -> 0.60 in 4s), slider links all sound
-  ========================================================= */
-  const BGM = new Audio();
-  BGM.preload = "auto";
-  BGM.loop = true;
-  BGM.playsInline = true;
-
-  const master = { value: 0.50, bgmBaseStart: 0.20, bgmBaseEnd: 0.60 };
-  let bgmBase = master.bgmBaseStart;
-
-  function applyBgmVolume(){
-    BGM.volume = Math.max(0, Math.min(1, bgmBase * master.value));
-  }
-  function setMasterVolume(v01){
-    master.value = Math.max(0, Math.min(1, v01));
-    applyBgmVolume();
-  }
-  volSlider.addEventListener("input", ()=>setMasterVolume(Number(volSlider.value)/100));
-
-  /* =========================================================
-    Title bubble float-in (keep)
-  ========================================================= */
-  function buildTitleLetters(text){
-    titleLetters.innerHTML = "";
-    [...text].forEach((ch)=>{
-      const span = document.createElement("span");
-      span.className = "letter";
-      span.textContent = ch;
-
-      const delay = 0.2 + Math.random()*0.6;   // 0.2〜0.8
-      const dur   = 2.5 + Math.random()*1.5;   // 2.5〜4.0
-      const sx    = (Math.random()*40 - 20);   // ±20px
-      const rot   = (Math.random()*14 - 7);    // ±7deg
-
-      span.style.setProperty("--sx", sx.toFixed(1)+"px");
-      span.style.setProperty("--rot", rot.toFixed(2)+"deg");
-      span.style.animation = `floatIn ${dur.toFixed(2)}s ease-out ${delay.toFixed(2)}s forwards`;
-
-      const holdAt = (delay + dur + 0.05)*1000;
-      setTimeout(()=>span.classList.add("hold"), holdAt);
-
-      titleLetters.appendChild(span);
-    });
-  }
-
-  /* =========================================================
-    Bubble canvas (home only)
-  ========================================================= */
-  const bctx = bubbleCanvas.getContext("2d", { alpha:true });
-  const bubbles = [];
-  let bubbleRAF = 0;
-  let lastT = 0;
-
-  function resizeCanvas(){
-    const dpr = Math.min(2, window.devicePixelRatio || 1);
-    bubbleCanvas.width  = Math.floor(window.innerWidth * dpr);
-    bubbleCanvas.height = Math.floor(window.innerHeight * dpr);
-    bubbleCanvas.style.width = window.innerWidth + "px";
-    bubbleCanvas.style.height = window.innerHeight + "px";
-    bctx.setTransform(dpr,0,0,dpr,0,0);
-  }
-  window.addEventListener("resize", resizeCanvas, {passive:true});
-
-  function spawnBubble(){
-    const w = window.innerWidth, h = window.innerHeight;
-    const r = 6 + Math.random()*18;
-    bubbles.push({
-      x: Math.random()*w,
-      y: h + r + Math.random()*40,
-      r,
-      spd: 12 + Math.random()*28,
-      phase: Math.random()*Math.PI*2,
-      amp: 10 + Math.random()*18,
-      wob: 0.9 + Math.random()*1.2,
-      life: 0,
-      alpha: 0.14 + Math.random()*0.22
-    });
-  }
-
-  function drawBubble(b){
-    const g = bctx.createRadialGradient(b.x - b.r*0.35, b.y - b.r*0.35, b.r*0.2, b.x, b.y, b.r);
-    g.addColorStop(0, `rgba(255,255,255,${b.alpha*0.55})`);
-    g.addColorStop(0.45, `rgba(191,234,255,${b.alpha*0.22})`);
-    g.addColorStop(1, `rgba(127,211,255,0)`);
-
-    bctx.beginPath();
-    bctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
-    bctx.fillStyle = g;
-    bctx.fill();
-
-    bctx.beginPath();
-    bctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
-    bctx.strokeStyle = `rgba(247,251,255,${b.alpha*0.55})`;
-    bctx.lineWidth = 1;
-    bctx.stroke();
-  }
-
-  function bubbleLoop(t){
-    const dt = Math.min(0.033, (t - lastT)/1000 || 0.016);
-    lastT = t;
-    const w = window.innerWidth, h = window.innerHeight;
-
-    bctx.clearRect(0,0,w,h);
-
-    const isMobile = matchMedia("(max-width: 720px)").matches;
-    const targetCount = isMobile ? 22 : 34;
-    if (bubbles.length < targetCount && Math.random() < (isMobile ? 0.65 : 0.85)){
-      spawnBubble();
-      if (!isMobile && Math.random() < 0.35) spawnBubble();
-    }
-
-    for (let i=bubbles.length-1;i>=0;i--){
-      const b = bubbles[i];
-      b.life += dt;
-      b.y -= b.spd * dt;
-      b.x += Math.sin(b.life * b.wob + b.phase) * (b.amp * dt);
-
-      const topFade = Math.max(0, Math.min(1, (b.y / (h*0.35))));
-      const saved = b.alpha;
-      b.alpha = saved * (0.35 + topFade*0.65);
-
-      drawBubble(b);
-
-      b.alpha = saved;
-      if (b.y < -b.r - 30 || b.x < -80 || b.x > w + 80) bubbles.splice(i,1);
-    }
-
-    bubbleRAF = requestAnimationFrame(bubbleLoop);
-  }
-
-  /* =========================================================
-    Details carousel (only image + <> + dots)
-  ========================================================= */
-  let carIndex = 0;
-  function setCarouselImages(imgs){
-    const list = imgs.length ? imgs : [
-      "data:image/svg+xml;charset=utf-8," + encodeURIComponent(`
-        <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750">
-          <defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0" stop-color="#7fd3ff" stop-opacity="0.22"/>
-            <stop offset="1" stop-color="#000" stop-opacity="0.35"/>
-          </linearGradient></defs>
-          <rect width="100%" height="100%" fill="url(#g)"/>
-          <text x="50%" y="50%" font-size="40" text-anchor="middle" fill="rgba(255,255,255,.90)" font-family="serif">
-            画像URLを CONFIG.detailImages に追加
-          </text>
-        </svg>
-      `)
-    ];
-    CONFIG.__carList = list;
-    carDots.innerHTML = "";
-    list.forEach((_, i)=>{
-      const d = document.createElement("div");
-      d.className = "dot" + (i===0 ? " on" : "");
-      d.addEventListener("click", ()=>goCar(i));
-      carDots.appendChild(d);
-    });
-    goCar(0);
-  }
-  function goCar(i){
-    const list = CONFIG.__carList || [];
-    if (!list.length) return;
-    carIndex = (i + list.length) % list.length;
-    carImage.src = list[carIndex];
-    [...carDots.children].forEach((d, idx)=>d.classList.toggle("on", idx===carIndex));
-  }
-  carPrev.addEventListener("click", ()=>goCar(carIndex-1));
-  carNext.addEventListener("click", ()=>goCar(carIndex+1));
-
-  // swipe
-  let sx=0, sy=0, dragging=false;
-  carViewport.addEventListener("pointerdown",(e)=>{
-    dragging=true; sx=e.clientX; sy=e.clientY;
-    carViewport.setPointerCapture(e.pointerId);
-  });
-  carViewport.addEventListener("pointerup",(e)=>{
-    if(!dragging) return;
-    dragging=false;
-    const dx=e.clientX-sx, dy=e.clientY-sy;
-    if (Math.abs(dx) > 40 && Math.abs(dx) > Math.abs(dy)){
-      goCar(carIndex + (dx<0 ? 1 : -1));
-    }
-  });
-
-  /* =========================================================
-    Firestore model (same)
-  ========================================================= */
-  const { sessionsCol, usersCol, participantsSub } = CONFIG.dbNames;
-
-  let uid = null;
-  let mySessionId = null;
-  let selectedSessionId = null;
-
-  let unsubSat = null;
-  let unsubSun = null;
-
-  function setStatus(t){ statusText.textContent = t; }
-
-  const sessionDocRef = (sid)=>doc(db, sessionsCol, sid);
-  const userDocRef = (u)=>doc(db, usersCol, u);
-  const participantDocRef = (sid,u)=>doc(db, sessionsCol, sid, participantsSub, u);
-
-  
-  // keep latest counts for join button enable
-  const live = {
-    sat: { count:0, cap: CONFIG.sessions.sat.capacity, closed:false },
-    sun: { count:0, cap: CONFIG.sessions.sun.capacity, closed:false },
-  };
-
-  function attachSessionListeners(){
-    unsubSat?.(); unsubSun?.();
-    unsubSat = onSnapshot(sessionDocRef(CONFIG.sessions.sat.id), (snap)=>{
-      const d = snap.data() || {count:0, capacity: CONFIG.sessions.sat.capacity};
-      const c = Number(d.count ?? 0);
-      const cap = Number(d.capacity ?? CONFIG.sessions.sat.capacity);
-      live.sat.count = c; live.sat.cap = cap; live.sat.closed = CONFIG.isClosed(c, cap);
-      badgeSat.textContent = CONFIG.rangeLabel(c);
-      refreshJoinConfirmState();
-    });
-    unsubSun = onSnapshot(sessionDocRef(CONFIG.sessions.sun.id), (snap)=>{
-      const d = snap.data() || {count:0, capacity: CONFIG.sessions.sun.capacity};
-      const c = Number(d.count ?? 0);
-      const cap = Number(d.capacity ?? CONFIG.sessions.sun.capacity);
-      live.sun.count = c; live.sun.cap = cap; live.sun.closed = CONFIG.isClosed(c, cap);
-      badgeSun.textContent = CONFIG.rangeLabel(c);
-      refreshJoinConfirmState();
-    });
-  }
-
-  async function loadMyState(){
-    if (!uid) return;
-    const usnap = await getDoc(userDocRef(uid));
-    mySessionId = usnap.exists() ? (usnap.data()?.sessionId || null) : null;
-    applyMyStateToHome();
-    applyMyStateToJoinAccess();
-    applyWaitText();
-  }
-
-  function applyWaitText(){
-    if (!mySessionId){
-      waitWhen.textContent = "—";
-      return;
-    }
-    waitWhen.textContent = (mySessionId === CONFIG.sessions.sat.id) ? CONFIG.sessions.sat.whenLine : CONFIG.sessions.sun.whenLine;
-  }
-
-  /* =========================================================
-    ★ システム修正（要望）
-    いったん待機になった人は「予定を外す」まで別日程へ変更できない
-    → joinSession で current がある場合は必ず拒否
-  ========================================================= */
-  async function joinSession(targetSessionId){
-    if (!uid) { showToast("認証がまだです…"); return; }
-
-    try{
-      await runTransaction(db, async (tx)=>{
-        const uref = userDocRef(uid);
-        const uSnap = await tx.get(uref);
-        const current = uSnap.exists() ? (uSnap.data().sessionId || null) : null;
-
-        // ★ すでに参加中なら「外してから」
-        if (current){
-          throw new Error("MUST_LEAVE_FIRST");
-        }
-
-        const target = (targetSessionId === CONFIG.sessions.sat.id) ? CONFIG.sessions.sat : CONFIG.sessions.sun;
-
-        const sref = sessionDocRef(target.id);
-        const sSnap = await tx.get(sref);
-        const sData = sSnap.exists() ? sSnap.data() : {count:0, capacity: target.capacity, hardMax: target.hardMax};
-
-        const count = Number(sData.count ?? 0);
-        const cap = Number(sData.capacity ?? target.capacity);
-        const hard = Number(sData.hardMax ?? target.hardMax);
-
-        if (count >= cap || count >= hard){
-          throw new Error("CLOSED");
-        }
-
-        // participant
-        const pref = participantDocRef(target.id, uid);
-        const pSnap = await tx.get(pref);
-        if (pSnap.exists()){
-          // 万一残ってたら整合だけ合わせる
-          tx.set(uref, { sessionId: target.id, updatedAt: serverTimestamp() }, { merge:true });
-          return;
-        }
-
-        tx.set(pref, { joinedAt: serverTimestamp() }, { merge:true });
-        tx.set(uref, { sessionId: target.id, updatedAt: serverTimestamp() }, { merge:true });
-        tx.set(sref, { updatedAt: serverTimestamp() }, { merge:true });
-        tx.set(sref, { count: count + 1 }, { merge:true });
-      });
-
-      await loadMyState();
-      showToast("参加予定に追加しました🌤");
-      showScreen("wait");
-    }catch(e){
-      if (e?.message === "MUST_LEAVE_FIRST"){
-        showToast("変更は「予定を外す」後にできます", 2200);
-      }else if (e?.message === "CLOSED"){
-        showToast("この回は受付終了です", 1800);
-      }else{
-        console.error(e);
-        showToast("参加登録に失敗しました", 2000);
+  <script>
+    (() => {
+      const CONFIG = {
+        maps: [
+          { name:'プール', id:'ZWF1DDPVR57G', image:'007.png' },
+          { name:'歩道橋', id:'NV5GKJ2Y8504', image:'008.png' },
+          { name:'３つのお部屋', id:'CD5X5ZH3ND0B', image:'009.png' }
+        ],
+        stampPalette: [
+          { id:'s1', url:'stamp1.png' },
+          { id:'s2', url:'stamp2.png' },
+          { id:'s3', url:'stamp3.png' },
+          { id:'s4', url:'stamp4.png' }
+        ],
+        bestPhotoText: '#ベストフォト '
+      };
+
+      const $ = (sel, root=document) => root.querySelector(sel);
+      const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
+      const state = {
+        currentPanel:'map',
+        editImageSrc:'',
+        editRotation:0,
+        editFlip:1,
+        editScale:1,
+        imageOffsetX:0,
+        imageOffsetY:0,
+        imageDrag:null,
+        grabMode:false,
+        color:{ brightness:100, saturation:100, warmth:0, cool:0 },
+        blur:{ radius:26, strength:6, feather:18 },
+        stamps:[],
+        activeStampId:null,
+        activeTool:'gallery'
+      };
+
+      const mapGrid = $('#mapGrid');
+      const editStage = $('#editStage');
+      const editPreview = $('#editPreview');
+      const editCanvasWrap = $('#editCanvasWrap');
+      const blurPreviewMask = $('#blurPreviewMask');
+      const blurFocusRing = $('#blurFocusRing');
+      const stampLayer = $('#stampLayer');
+      const stampPalette = $('#stampPalette');
+      const bestPhotoBtn = $('#bestPhotoBtn');
+      const bgVideo = $('#bgVideo');
+
+      function on(el, event, handler){ if (el) el.addEventListener(event, handler); }
+
+      function setPanel(name){
+        state.currentPanel = name;
+        $('#panelMap').classList.toggle('active', name === 'map');
+        $('#panelHome').classList.toggle('active', name === 'home');
+        $('#panelEdit').classList.toggle('active', name === 'edit');
+        $$('.nav-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.panel === name));
       }
-    }
-  }
 
-  async function leaveSession(){
-    if (!uid) return;
-    try{
-      await runTransaction(db, async (tx)=>{
-        const uref = userDocRef(uid);
-        const uSnap = await tx.get(uref);
-        const current = uSnap.exists() ? (uSnap.data().sessionId || null) : null;
-        if (!current) return;
-
-        const sref = sessionDocRef(current);
-        const pref = participantDocRef(current, uid);
-
-        const sSnap = await tx.get(sref);
-        const pSnap = await tx.get(pref);
-
-        if (pSnap.exists()){
-          tx.delete(pref);
-          if (sSnap.exists()){
-            const c = Number(sSnap.data().count ?? 0);
-            tx.set(sref, { count: Math.max(0, c-1), updatedAt: serverTimestamp() }, { merge:true });
+      function buildMaps(){
+        mapGrid.innerHTML = '';
+        CONFIG.maps.forEach(map => {
+          const card = document.createElement('div');
+          card.className = 'map-card';
+          card.innerHTML = `
+            <div class="map-thumb">
+              <img src="${map.image || ''}" alt="${map.name}">
+              <div class="map-fallback">画像はあとから追加</div>
+            </div>
+            <div class="map-name">${map.name}</div>
+            <div class="map-id">ID：${map.id}</div>
+          `;
+          const img = $('img', card);
+          const fallback = $('.map-fallback', card);
+          if (img) {
+            img.addEventListener('load', () => { if (fallback) fallback.style.display = 'none'; });
+            img.addEventListener('error', () => { img.style.display = 'none'; if (fallback) fallback.style.display = 'grid'; });
+            if (!map.image) {
+              img.style.display = 'none';
+              if (fallback) fallback.style.display = 'grid';
+            }
           }
-        }else{
-          // participant無しでも userだけ外す
-          tx.set(sref, { updatedAt: serverTimestamp() }, { merge:true });
-        }
+          mapGrid.appendChild(card);
+        });
+      }
 
-        tx.set(uref, { sessionId: null, updatedAt: serverTimestamp() }, { merge:true });
-      });
+      function buildStampPalette(){
+        stampPalette.innerHTML = '';
+        CONFIG.stampPalette.forEach(item => {
+          const btn = document.createElement('button');
+          btn.className = 'stamp-btn';
+          btn.type = 'button';
+          btn.dataset.url = item.url || '';
+          btn.innerHTML = `<img src="${item.url || ''}" alt="${item.id}"><span>${item.id}</span>`;
+          const img = $('img', btn);
+          if (img) {
+            img.addEventListener('error', () => {
+              img.remove();
+              const span = $('span', btn);
+              if (span) span.textContent = item.url || item.id;
+            });
+          }
+          stampPalette.appendChild(btn);
+        });
+      }
 
-      await loadMyState();
-      showToast("予定を外しました");
-      showScreen("join");
-    }catch(e){
-      console.error(e);
-      showToast("キャンセルに失敗しました", 2000);
-    }
-  }
+      function applyEditTransform(){
+        const hasImage = !!state.editImageSrc;
+        editStage.classList.toggle('has-image', hasImage);
+        editPreview.style.transform = `translate(calc(-50% + ${state.imageOffsetX}px), calc(-50% + ${state.imageOffsetY}px)) rotate(${state.editRotation}deg) scale(${state.editScale}) scaleX(${state.editFlip})`;
+        editPreview.style.filter = `brightness(${state.color.brightness / 100}) saturate(${state.color.saturation / 100}) sepia(${Math.max(0, state.color.warmth / 100)}) hue-rotate(${state.color.warmth * -0.6 - state.color.cool * 0.8}deg)`;
+        editPreview.style.opacity = String(Math.min(1, 0.96 + state.color.cool / 300));
 
-  /* =========================================================
-    Join UI selection + confirm button state
-  ========================================================= */
-  function setSelectedSession(sid){
-    selectedSessionId = sid;
-    rowSat.classList.toggle("on", sid === CONFIG.sessions.sat.id);
-    rowSun.classList.toggle("on", sid === CONFIG.sessions.sun.id);
-    refreshJoinConfirmState();
-  }
+        const inner = Math.max(0, state.blur.radius - state.blur.feather);
+        const outer = state.blur.radius + state.blur.feather;
+        const mask = `radial-gradient(circle at center, transparent 0%, transparent ${inner}%, rgba(0,0,0,.2) ${state.blur.radius}%, rgba(0,0,0,1) ${outer}%)`;
+        blurPreviewMask.style.backdropFilter = `blur(${state.blur.strength * 1.5}px)`;
+        blurPreviewMask.style.webkitMaskImage = mask;
+        blurPreviewMask.style.maskImage = mask;
+        blurFocusRing.style.width = `${state.blur.radius * 2}%`;
+        blurFocusRing.style.height = `${state.blur.radius * 2}%`;
+        editCanvasWrap.classList.toggle('grab-mode', state.grabMode);
 
-  function refreshJoinConfirmState(){
-    // 参加中なら join 画面自体に来ない設計だが念のため
-    if (mySessionId){
-      joinConfirmBtn.disabled = true;
-      return;
-    }
-    if (!selectedSessionId){
-      joinConfirmBtn.disabled = true;
-      return;
-    }
-    const which = (selectedSessionId === CONFIG.sessions.sat.id) ? "sat" : "sun";
-    joinConfirmBtn.disabled = !!live[which].closed;
-  }
+        stampLayer.querySelectorAll('.stamp-item').forEach(el => {
+          const stamp = state.stamps.find(v => v.id === el.dataset.id);
+          if (!stamp) return;
+          el.style.width = `${stamp.size}px`;
+          el.style.transform = `translate(${stamp.x}px, ${stamp.y}px) rotate(${stamp.rotate}deg)`;
+          el.classList.toggle('active', state.activeStampId === stamp.id);
+        });
+      }
 
-  function applyMyStateToHome(){
-    // 参加中なら「参加予定」ボタンは “押せない（再応募不可）”
-    if (mySessionId){
-      homeJoinBtn.disabled = true;
-      homeJoinBtn.textContent = "参加予定";
-    }else{
-      homeJoinBtn.disabled = false;
-      homeJoinBtn.textContent = "参加応募";
-    }
-  }
+      function setTool(name){
+        state.activeTool = name;
+        $$('.tool-tab').forEach(btn => btn.classList.toggle('active', btn.dataset.tool === name));
+        $$('.tool-section').forEach(sec => sec.classList.remove('active'));
+        const map = { gallery:'#toolGallery', color:'#toolColor', stamp:'#toolStamp', blur:'#toolBlur' };
+        const target = $(map[name]);
+        if (target) target.classList.add('active');
+      }
 
-  function applyMyStateToJoinAccess(){
-    // 参加中は Join 画面へ行かず Waitへ
-    // （要望：待機になった人は参加予定を押しても再応募できない）
-    // → homeJoinBtnはdisabled。もしどこかでJoinへ来ても、joinSessionで拒否。
-  }
+      function syncStampControls(){
+        const stamp = state.stamps.find(v => v.id === state.activeStampId);
+        if (!stamp) return;
+        $('#stampSizeRange').value = stamp.size;
+        $('#stampRotateRange').value = stamp.rotate;
+      }
 
-  /* =========================================================
-    Events
-  ========================================================= */
-  rowSat.addEventListener("click", ()=>setSelectedSession(CONFIG.sessions.sat.id));
-  rowSun.addEventListener("click", ()=>setSelectedSession(CONFIG.sessions.sun.id));
-  rowSat.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setSelectedSession(CONFIG.sessions.sat.id); }});
-  rowSun.addEventListener("keydown",(e)=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); setSelectedSession(CONFIG.sessions.sun.id); }});
+      function addStamp(src){
+        if (!src) return;
+        const id = `stamp_${Date.now()}_${Math.random().toString(36).slice(2,6)}`;
+        const stamp = { id, src, x:0, y:0, size:120, rotate:0 };
+        state.stamps.push(stamp);
+        state.activeStampId = id;
 
-  joinConfirmBtn.addEventListener("click", ()=>{
-    if (!selectedSessionId) return;
-    joinSession(selectedSessionId);
-  });
+        const el = document.createElement('img');
+        el.className = 'stamp-item';
+        el.dataset.id = id;
+        el.src = src;
+        el.draggable = false;
+        el.addEventListener('error', () => {
+          el.remove();
+          state.stamps = state.stamps.filter(v => v.id !== id);
+          state.activeStampId = state.stamps[0]?.id || null;
+          syncStampControls();
+          applyEditTransform();
+        });
 
-  leaveBtn.addEventListener("click", ()=>leaveSession());
+        let drag = null;
+        el.addEventListener('pointerdown', e => {
+          const s = state.stamps.find(v => v.id === id);
+          if (!s) return;
+          state.activeStampId = id;
+          drag = { x:e.clientX - s.x, y:e.clientY - s.y };
+          el.setPointerCapture(e.pointerId);
+          syncStampControls();
+          applyEditTransform();
+        });
+        el.addEventListener('pointermove', e => {
+          if (!drag) return;
+          const s = state.stamps.find(v => v.id === id);
+          if (!s) return;
+          s.x = e.clientX - drag.x;
+          s.y = e.clientY - drag.y;
+          applyEditTransform();
+        });
+        el.addEventListener('pointerup', () => { drag = null; });
+        el.addEventListener('pointercancel', () => { drag = null; });
+        el.addEventListener('click', () => {
+          state.activeStampId = id;
+          syncStampControls();
+          applyEditTransform();
+        });
 
-  homeDetailsBtn.addEventListener("click", ()=>{ showScreen("details"); });
-  homeJoinBtn.addEventListener("click", ()=>{
-    // 参加中は押せない（disabled）。未参加ならjoinへ。
-    if (mySessionId) return;
-    selectedSessionId = null;
-    rowSat.classList.remove("on");
-    rowSun.classList.remove("on");
-    joinConfirmBtn.disabled = true;
-    showScreen("join");
-  });
+        stampLayer.appendChild(el);
+        syncStampControls();
+        applyEditTransform();
+      }
 
-  backFromDetails.addEventListener("click", ()=>showScreen("home"));
-  backFromJoin.addEventListener("click", ()=>showScreen("home"));
-  backFromWait.addEventListener("click", ()=>showScreen("home"));
-
-  // Credits
-  creditText.textContent = CONFIG.credits;
-  creditBtn.addEventListener("click", ()=>creditModal.classList.add("on"));
-  closeCredit.addEventListener("click", ()=>creditModal.classList.remove("on"));
-  creditModal.addEventListener("click",(e)=>{ if(e.target===creditModal) creditModal.classList.remove("on"); });
-
-  // Tap anywhere to re-try BGM play if blocked
-  document.addEventListener("pointerdown", async ()=>{
-    if (!BGM.src) return;
-    if (BGM.paused){
-      try{ await BGM.play(); }catch(_){}
-    }
-  }, {passive:true});
-
-  /* =========================================================
-    Start flow (tap anywhere on loader)
-    - 最初から load.gif 表示
-    - 画面タップ → 匿名認証 → preload → home
-    - black veil: 6s fully black, then 5s fade out
-  ========================================================= */
-  function isLowPower(){
-    const mobile = matchMedia("(max-width: 720px)").matches;
-    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
-    return mobile || reduce;
-  }
-
-  async function preloadAssets(){
-    const jobs = [];
-
-    const imgs = [
-      CONFIG.assets.loadGif,
-      ...CONFIG.assets.preloadImages,
-      ...CONFIG.detailImages
-    ].filter(Boolean);
-
-    imgs.forEach((src)=>{
-      jobs.push(new Promise((res)=>{
+      function saveEditedImage(){
+        if (!state.editImageSrc) return;
         const img = new Image();
-        img.onload = ()=>res({ok:true, src});
-        img.onerror = ()=>res({ok:false, src});
-        img.src = src;
-      }));
-    });
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const w = img.naturalWidth;
+          const h = img.naturalHeight;
+          canvas.width = w;
+          canvas.height = h;
 
-    const vids = [CONFIG.assets.bgVideo, ...CONFIG.assets.preloadVideos].filter(Boolean);
-    vids.forEach((src)=>{
-      jobs.push(new Promise((res)=>{
-        const v = document.createElement("video");
-        v.preload = "metadata";
-        v.onloadedmetadata = ()=>res({ok:true, src});
-        v.onerror = ()=>res({ok:false, src});
-        v.src = src;
-      }));
-    });
+          ctx.filter = `brightness(${state.color.brightness / 100}) saturate(${state.color.saturation / 100}) sepia(${Math.max(0, state.color.warmth / 100)}) hue-rotate(${state.color.warmth * -0.6 - state.color.cool * 0.8}deg)`;
+          ctx.translate(w / 2 + state.imageOffsetX, h / 2 + state.imageOffsetY);
+          ctx.rotate((state.editRotation % 360) * Math.PI / 180);
+          ctx.scale(state.editFlip * state.editScale, state.editScale);
+          ctx.drawImage(img, -w / 2, -h / 2);
+          ctx.setTransform(1,0,0,1,0,0);
 
-    const auds = [CONFIG.assets.bgm, ...CONFIG.assets.preloadAudio].filter(Boolean);
-    auds.forEach((src)=>{
-      jobs.push(new Promise((res)=>{
-        const a = new Audio();
-        a.preload = "metadata";
-        a.onloadedmetadata = ()=>res({ok:true, src});
-        a.onerror = ()=>res({ok:false, src});
-        a.src = src;
-      }));
-    });
+          if (state.blur.strength > 0) {
+            const blurCanvas = document.createElement('canvas');
+            const blurCtx = blurCanvas.getContext('2d');
+            blurCanvas.width = w;
+            blurCanvas.height = h;
+            blurCtx.filter = `blur(${state.blur.strength * 2}px)`;
+            blurCtx.drawImage(canvas, 0, 0);
 
-    const total = Math.max(1, jobs.length);
-    let done = 0;
-    const concurrency = isLowPower() ? 4 : 8;
-    let idx = 0;
+            const maskCanvas = document.createElement('canvas');
+            const maskCtx = maskCanvas.getContext('2d');
+            maskCanvas.width = w;
+            maskCanvas.height = h;
+            const cx = w / 2;
+            const cy = h / 2;
+            const r = Math.min(w, h) * (state.blur.radius / 100);
+            const feather = Math.min(w, h) * (state.blur.feather / 200);
+            const grad = maskCtx.createRadialGradient(cx, cy, Math.max(0, r - feather), cx, cy, r + feather);
+            grad.addColorStop(0, 'rgba(0,0,0,0)');
+            grad.addColorStop(0.7, 'rgba(0,0,0,0)');
+            grad.addColorStop(1, 'rgba(0,0,0,1)');
+            maskCtx.fillStyle = grad;
+            maskCtx.fillRect(0, 0, w, h);
 
-    function tick(){
-      done++;
-      const p = Math.round((done/total)*100);
-      progressFill.style.width = p + "%";
-    }
+            const original = ctx.getImageData(0,0,w,h);
+            const blurred = blurCtx.getImageData(0,0,w,h);
+            const mask = maskCtx.getImageData(0,0,w,h);
+            const out = ctx.createImageData(w,h);
+            for (let i = 0; i < out.data.length; i += 4) {
+              const m = mask.data[i + 3] / 255;
+              out.data[i] = original.data[i] * (1 - m) + blurred.data[i] * m;
+              out.data[i + 1] = original.data[i + 1] * (1 - m) + blurred.data[i + 1] * m;
+              out.data[i + 2] = original.data[i + 2] * (1 - m) + blurred.data[i + 2] * m;
+              out.data[i + 3] = 255;
+            }
+            ctx.putImageData(out, 0, 0);
+          }
 
-    const runners = new Array(concurrency).fill(0).map(async ()=>{
-      while (idx < jobs.length){
-        const j = jobs[idx++];
-        try{ await j; }catch(_){}
-        tick();
-      }
-    });
+          const finish = () => {
+            const link = document.createElement('a');
+            link.download = 'edited-image.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+          };
 
-    await Promise.all(runners);
-    progressFill.style.width = "100%";
-  }
+          if (!state.stamps.length) {
+            finish();
+            return;
+          }
 
-  async function initFirebaseAuth(){
-    setStatus("接続：認証中");
-    await signInAnonymously(auth);
-    return new Promise((res)=>{
-      const off = onAuthStateChanged(auth, (user)=>{
-        if (user){
-          uid = user.uid;
-          off();
-          res(user);
-        }
-      });
-    });
-  }
-
-  async function ensureSessionDocs(){
-    const all = [CONFIG.sessions.sat, CONFIG.sessions.sun];
-    for (const s of all){
-      const ref = sessionDocRef(s.id);
-      const snap = await getDoc(ref);
-      if (!snap.exists()){
-        await setDoc(ref, { count:0, capacity:s.capacity, hardMax:s.hardMax, createdAt: serverTimestamp(), updatedAt: serverTimestamp() }, { merge:true });
-      }else{
-        await setDoc(ref, { capacity:s.capacity, hardMax:s.hardMax, updatedAt: serverTimestamp() }, { merge:true });
-      }
-    }
-  }
-
-  async function startBgmAndTitle(){
-    // bg video start (muted loop)
-    bgVideo.src = CONFIG.assets.bgVideo;
-    try{ await bgVideo.play(); }catch(_){}
-
-    // black veil timing: 6s stay black, then fade 5s
-    setTimeout(()=>veil.classList.add("fade"), 6000);
-
-    // BGM
-    BGM.src = CONFIG.assets.bgm;
-    bgmBase = master.bgmBaseStart;
-    applyBgmVolume();
-    try{ await BGM.play(); }catch(e){
-      // ok: user can tap again
-      showToast("音が出ない場合はもう一度タップ", 2400);
-    }
-
-    // ramp 0.20 -> 0.60 over 4s
-    const start = performance.now();
-    const dur = 4000;
-    const step = ()=>{
-      const t = performance.now() - start;
-      const k = Math.max(0, Math.min(1, t/dur));
-      bgmBase = master.bgmBaseStart + (master.bgmBaseEnd - master.bgmBaseStart) * k;
-      applyBgmVolume();
-      if (k < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-
-    // title letters + bubbles (start when BGM starts)
-    buildTitleLetters(CONFIG.eventTitle);
-    resizeCanvas();
-    cancelAnimationFrame(bubbleRAF);
-    bubbleRAF = requestAnimationFrame(bubbleLoop);
-  }
-
-  // Initial: show loader, start dots, show gif immediately
-  function bootVisual(){
-    showScreen("loader");
-    loadGif.src = CONFIG.assets.loadGif;
-    startDots();
-    progressFill.style.width = "0%";
-    setMasterVolume(Number(volSlider.value)/100);
-    creditText.textContent = CONFIG.credits;
-    setCarouselImages(CONFIG.detailImages);
-  }
-  bootVisual();
-
-  let started = false;
-  loaderScreen.addEventListener("click", async ()=>{
-    if (started) return;
-    started = true;
-
-    setStatus("接続：開始");
-    try{
-      await initFirebaseAuth();
-      setStatus("接続：Firestore準備");
-      await ensureSessionDocs();
-      attachSessionListeners();
-      await loadMyState();
-      setStatus("接続：OK");
-    }catch(e){
-      console.error(e);
-      setStatus("接続：エラー");
-      // UIは続行
-    }
-
-    // preload
-    await preloadAssets();
-    stopDots();
-
-    // start bgm/title and go home
-    await startBgmAndTitle();
-    showScreen("home");
-  });
-
-  /* =========================================================
-    Home -> Details/Join gating:
-    - 参加中は homeJoinBtn が disabled (再応募不可)
-    - Join画面へは未参加のみ
-    - 参加中の人がどこかで joinSession を呼んでも必ず拒否（外すまで変更不可）
-  ========================================================= */
-
-
-</script>
-
-
-<script>
-(() => {
-  // =========================
-  // 改善版：炭酸 burst を「短く噴いて、残りが自然に抜ける」へ
-  // - 密度を下げて隙間を残す
-  // - 生成は最初だけ（下から無限に出さない）
-  // - 突然消えない（自然減 + 最後にゆっくりフェード）
-  // - 背景が見える程度に薄く（目立ちすぎ防止）
-  // - 粒サイズは既存と同帯（6〜24px）
-  // =========================
-
-  const $ = (s) => document.querySelector(s);
-
-  const homeScreen = $("#homeScreen");
-  const homeSub = $("#homeSub");
-  const homeJoinBtn = $("#homeJoinBtn");
-  const homeDetailsBtn = $("#homeDetailsBtn");
-  const volSlider = $("#volSlider");
-
-  // --- pushu.mp3 ---
-  const pushu = new Audio("pushu.mp3");
-  pushu.preload = "auto";
-  pushu.playsInline = true;
-
-  function masterVol01(){
-    const v = Number(volSlider?.value ?? 50);
-    return Math.max(0, Math.min(1, v / 100));
-  }
-  if (volSlider){
-    volSlider.addEventListener("input", () => {
-      pushu.volume = Math.min(1, masterVol01() * 0.70); // 少し控えめ
-    });
-  }
-  pushu.volume = Math.min(1, masterVol01() * 0.70);
-
-  // --- Home UI：最初は非表示 ---
-  function hardHideHomeUI(){
-    if (!homeSub || !homeJoinBtn || !homeDetailsBtn) return;
-    const hide = (el) => {
-      el.style.opacity = "0";
-      el.style.transform = "translateY(10px)";
-      el.style.filter = "blur(6px)";
-      el.style.pointerEvents = "none";
-      el.style.transition = "none";
-    };
-    hide(homeSub); hide(homeDetailsBtn); hide(homeJoinBtn);
-  }
-  function reveal(el, sec){
-    if (!el) return;
-    el.style.willChange = "opacity, transform, filter";
-    el.style.transition = `opacity ${sec}s ease, transform ${sec}s ease, filter ${sec}s ease`;
-    requestAnimationFrame(() => {
-      el.style.opacity = "1";
-      el.style.transform = "translateY(0px)";
-      el.style.filter = "blur(0px)";
-      el.style.pointerEvents = "auto";
-    });
-  }
-
-  // =========================
-  // Burst canvas
-  // =========================
-  let canvas = null, ctx = null;
-  let raf = 0;
-  const bubbles = [];
-  let startMs = 0;
-  let durationMs = 1500;
-
-  // ✅ 生成するのは最初の少しだけ（炭酸の“噴き上げ”）
-  const SPAWN_WINDOW_MS = 350;      // 0.35秒だけ生成
-  const MAX_BUBBLES = 140;          // 画面が埋まらない上限（隙間確保）
-
-  function ensureCanvas(){
-    if (canvas) return;
-    canvas = document.createElement("canvas");
-    canvas.id = "burstCanvas";
-    canvas.style.position = "fixed";
-    canvas.style.inset = "0";
-    canvas.style.zIndex = "21";
-    canvas.style.pointerEvents = "none";
-    canvas.style.opacity = "0";
-    canvas.style.transition = "opacity 350ms ease";
-    document.body.appendChild(canvas);
-    ctx = canvas.getContext("2d", { alpha:true });
-
-    const resize = () => {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
-      canvas.width = Math.floor(window.innerWidth * dpr);
-      canvas.height = Math.floor(window.innerHeight * dpr);
-      canvas.style.width = window.innerWidth + "px";
-      canvas.style.height = window.innerHeight + "px";
-      ctx.setTransform(dpr,0,0,dpr,0,0);
-    };
-    resize();
-    window.addEventListener("resize", resize, {passive:true});
-  }
-
-  function spawn(){
-    if (bubbles.length >= MAX_BUBBLES) return;
-
-    const w = window.innerWidth, h = window.innerHeight;
-
-
-    const r = 6 + Math.random() * 18;
-
-  
-    const x = Math.random() * w;
-
-    
-    const y = h + r + Math.random() * 40;
-
-   
-    const spd = 260 + Math.random() * 420;
-
-    const amp = 8 + Math.random() * 14;
-    const wob = 1.0 + Math.random() * 1.2;
-
-   
-    const alpha = 0.08 + Math.random() * 0.12;
-
-    bubbles.push({ x, y, r, spd, amp, wob, phase: Math.random()*Math.PI*2, life: 0, alpha });
-  }
-
-  function draw(b, globalFade){
-    const a = b.alpha * globalFade;
-
-
-    const g = ctx.createRadialGradient(
-      b.x - b.r*0.35, b.y - b.r*0.35, b.r*0.2,
-      b.x, b.y, b.r
-    );
-    g.addColorStop(0, `rgba(255,255,255,${a*0.45})`);
-    g.addColorStop(0.55, `rgba(191,234,255,${a*0.18})`);
-    g.addColorStop(1, `rgba(127,211,255,0)`);
-
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
-    ctx.fillStyle = g;
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(b.x, b.y, b.r, 0, Math.PI*2);
-    ctx.strokeStyle = `rgba(247,251,255,${a*0.30})`;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-  }
-
-  function runBurst(ms=1500){
-    ensureCanvas();
-    durationMs = ms;
-    bubbles.length = 0;
-    startMs = performance.now();
-
-    // 出現は“ふわっ”と（急にドンと出ない）
-    canvas.style.opacity = "1";
-
-    // SE
-    try{
-      pushu.currentTime = 0;
-      pushu.volume = Math.min(1, masterVol01() * 0.70);
-      pushu.play().catch(()=>{});
-    }catch(_){}
-
-    let last = startMs;
-
-    const loop = (t) => {
-      const w = window.innerWidth, h = window.innerHeight;
-      const dt = Math.min(0.033, (t - last)/1000 || 0.016);
-      last = t;
-
-      ctx.clearRect(0,0,w,h);
-
-      const elapsed = t - startMs;
-      const p = Math.max(0, Math.min(1, elapsed / durationMs)); // 0..1
-
-      
-      if (elapsed < SPAWN_WINDOW_MS) {
-        // 初動だけ少し多め → すぐ落ち着く（隙間残す）
-        const k = 1 - (elapsed / SPAWN_WINDOW_MS); // 1→0
-        const perFrame = Math.floor(4 + 10*k);     // 14→4 程度
-        for (let i=0;i<perFrame;i++) spawn();
+          let loaded = 0;
+          state.stamps.forEach(stamp => {
+            const sImg = new Image();
+            sImg.onload = () => {
+              ctx.save();
+              ctx.translate(w / 2 + stamp.x, h / 2 + stamp.y);
+              ctx.rotate(stamp.rotate * Math.PI / 180);
+              ctx.drawImage(sImg, -stamp.size / 2, -stamp.size / 2, stamp.size, stamp.size);
+              ctx.restore();
+              loaded += 1;
+              if (loaded === state.stamps.length) finish();
+            };
+            sImg.onerror = () => {
+              loaded += 1;
+              if (loaded === state.stamps.length) finish();
+            };
+            sImg.src = stamp.src;
+          });
+        };
+        img.src = state.editImageSrc;
       }
 
-      const globalFade = (p < 0.70) ? 1 : (1 - (p - 0.70) / 0.30);
-
-      // canvasも同様にゆっくり
-      canvas.style.opacity = String(Math.max(0, Math.min(1, globalFade)));
-
-      for (let i=bubbles.length-1;i>=0;i--){
-        const b = bubbles[i];
-        b.life += dt;
-        b.y -= b.spd * dt;
-        b.x += Math.sin(b.life * b.wob + b.phase) * (b.amp * dt);
-
-        // 上に行くほど薄く（既存寄せ）
-        const topFade = Math.max(0, Math.min(1, (b.y / (h*0.35))));
-        const local = (0.35 + topFade*0.65);
-
-        draw(b, globalFade * local);
-
-        // 
-        if (b.y < -b.r - 60 || b.x < -120 || b.x > w + 120){
-          bubbles.splice(i,1);
-        }
+      function openBestPhoto(){
+        const text = encodeURIComponent(CONFIG.bestPhotoText);
+        const url = `https://x.com/intent/post?text=${text}`;
+        window.open(url, '_blank', 'noopener,noreferrer');
       }
 
-      if (elapsed < durationMs || bubbles.length > 0){
-        raf = requestAnimationFrame(loop);
-      } else {
-        cancelAnimationFrame(raf);
-        raf = 0;
-        canvas.style.opacity = "0";
+      function bind(){
+        $$('.nav-btn').forEach(btn => on(btn, 'click', () => setPanel(btn.dataset.panel)));
+        $$('.tool-tab').forEach(btn => on(btn, 'click', () => setTool(btn.dataset.tool)));
+        on(bestPhotoBtn, 'click', openBestPhoto);
+
+        on($('#editFileInput'), 'change', e => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          const reader = new FileReader();
+          reader.onload = () => {
+            state.editImageSrc = reader.result;
+            editPreview.src = reader.result;
+            state.editRotation = 0;
+            state.editFlip = 1;
+            state.editScale = 1;
+            state.imageOffsetX = 0;
+            state.imageOffsetY = 0;
+            applyEditTransform();
+          };
+          reader.readAsDataURL(file);
+        });
+
+        on($('#grabImageBtn'), 'click', () => {
+          state.grabMode = !state.grabMode;
+          $('#grabImageBtn').classList.toggle('active', state.grabMode);
+          editCanvasWrap.classList.toggle('grab-mode', state.grabMode);
+        });
+        on($('#resetPositionBtn'), 'click', () => {
+          state.imageOffsetX = 0;
+          state.imageOffsetY = 0;
+          applyEditTransform();
+        });
+        on($('#rotateBtn'), 'click', () => { state.editRotation += 90; applyEditTransform(); });
+        on($('#flipBtn'), 'click', () => { state.editFlip *= -1; applyEditTransform(); });
+        on($('#zoomInBtn'), 'click', () => { state.editScale = Math.min(3, state.editScale + 0.1); applyEditTransform(); });
+        on($('#zoomOutBtn'), 'click', () => { state.editScale = Math.max(0.4, state.editScale - 0.1); applyEditTransform(); });
+        on($('#resetEditBtn'), 'click', () => {
+          state.editRotation = 0;
+          state.editFlip = 1;
+          state.editScale = 1;
+          state.imageOffsetX = 0;
+          state.imageOffsetY = 0;
+          state.color = { brightness:100, saturation:100, warmth:0, cool:0 };
+          const coolRange = $('#coolRange');
+          if (coolRange) coolRange.value = '0';
+          state.blur = { radius:26, strength:6, feather:18 };
+          applyEditTransform();
+        });
+
+        on($('#brightnessRange'), 'input', e => { state.color.brightness = Number(e.target.value); applyEditTransform(); });
+        on($('#saturationRange'), 'input', e => { state.color.saturation = Number(e.target.value); applyEditTransform(); });
+        on($('#coolRange'), 'input', e => { state.color.cool = Number(e.target.value); applyEditTransform(); });
+        on($('#warmthRange'), 'input', e => { state.color.warmth = Number(e.target.value); applyEditTransform(); });
+        on($('#youthPresetBtn'), 'click', () => {
+          state.color.brightness = 112;
+          state.color.saturation = 128;
+          state.color.cool = 24;
+          state.color.warmth = -6;
+          $('#brightnessRange').value = String(state.color.brightness);
+          $('#saturationRange').value = String(state.color.saturation);
+          $('#coolRange').value = String(state.color.cool);
+          $('#warmthRange').value = String(state.color.warmth);
+          applyEditTransform();
+        });
+        on($('#blurRadiusRange'), 'input', e => { state.blur.radius = Number(e.target.value); applyEditTransform(); });
+        on($('#blurStrengthRange'), 'input', e => { state.blur.strength = Number(e.target.value); applyEditTransform(); });
+        on($('#blurFeatherRange'), 'input', e => { state.blur.feather = Number(e.target.value); applyEditTransform(); });
+        on($('#stampSizeRange'), 'input', e => {
+          const stamp = state.stamps.find(v => v.id === state.activeStampId);
+          if (!stamp) return;
+          stamp.size = Number(e.target.value);
+          applyEditTransform();
+        });
+        on($('#stampRotateRange'), 'input', e => {
+          const stamp = state.stamps.find(v => v.id === state.activeStampId);
+          if (!stamp) return;
+          stamp.rotate = Number(e.target.value);
+          applyEditTransform();
+        });
+        on($('#deleteStampBtn'), 'click', () => {
+          if (!state.activeStampId) return;
+          state.stamps = state.stamps.filter(v => v.id !== state.activeStampId);
+          const el = stampLayer.querySelector(`[data-id="${state.activeStampId}"]`);
+          if (el) el.remove();
+          state.activeStampId = state.stamps[0]?.id || null;
+          syncStampControls();
+          applyEditTransform();
+        });
+        on($('#saveImageBtn'), 'click', saveEditedImage);
+
+        on(editCanvasWrap, 'pointerdown', e => {
+          if (!state.grabMode || !state.editImageSrc) return;
+          state.imageDrag = { x:e.clientX - state.imageOffsetX, y:e.clientY - state.imageOffsetY };
+          editCanvasWrap.classList.add('grabbing');
+          editCanvasWrap.setPointerCapture(e.pointerId);
+        });
+        on(editCanvasWrap, 'pointermove', e => {
+          if (!state.imageDrag || !state.grabMode) return;
+          state.imageOffsetX = e.clientX - state.imageDrag.x;
+          state.imageOffsetY = e.clientY - state.imageDrag.y;
+          applyEditTransform();
+        });
+        on(editCanvasWrap, 'pointerup', () => {
+          state.imageDrag = null;
+          editCanvasWrap.classList.remove('grabbing');
+        });
+        on(editCanvasWrap, 'pointercancel', () => {
+          state.imageDrag = null;
+          editCanvasWrap.classList.remove('grabbing');
+        });
+
+        on(stampPalette, 'click', e => {
+          const btn = e.target.closest('[data-url]');
+          if (!btn) return;
+          addStamp(btn.dataset.url);
+        });
+
+        on(editCanvasWrap, 'dragstart', e => { e.preventDefault(); });
+        on(editPreview, 'dragstart', e => { e.preventDefault(); });
+        on(bgVideo, 'error', () => {
+          bgVideo.style.display = 'none';
+        });
       }
-    };
 
-    cancelAnimationFrame(raf);
-    raf = requestAnimationFrame(loop);
-  }
-
-  // =========================
-  // schedule（home表示を起点）
-  // =========================
-  let scheduled = false;
-
-  function schedule(){
-    if (scheduled) return;
-    scheduled = true;
-
-    hardHideHomeUI();
-
-    const fadeEnd = 11000;    // 既存：tap後11秒で黒が消える
-    const advance = 4800;     // あなたの環境で遅れてた分
-
-    // 「黒フェイドが消える0.5秒前から」→ それを前倒し
-    const burstAt = Math.max(0, fadeEnd - 500 - advance);
-
-    setTimeout(() => runBurst(1500), burstAt);
-
-    // UI表示シーケンスはそのまま
-    setTimeout(() => {
-      reveal(homeSub, 3);
-      setTimeout(() => reveal(homeDetailsBtn, 3), 2000);
-      setTimeout(() => reveal(homeJoinBtn, 5), 5000);
-    }, fadeEnd);
-  }
-
-  // home表示で開始
-  const mo = new MutationObserver(() => {
-    if (homeScreen && !homeScreen.classList.contains("hidden")) schedule();
-  });
-  if (homeScreen) mo.observe(homeScreen, { attributes:true, attributeFilter:["class"] });
-  if (homeScreen && !homeScreen.classList.contains("hidden")) schedule();
-})();
-</script>
-  <script>
-(() => {
-  const $ = (s) => document.querySelector(s);
-  const homeScreen = $("#homeScreen");
-  const bubbleCanvas = $("#bubbleCanvas");
-
-  if (!homeScreen || !bubbleCanvas) return;
-
-  // 黒ベール完了まで泡を見せない（既存仕様：home表示を起点に 11秒で黒が消える）
-  const FADE_END_MS = 11000;
-
-  function hideBubblesDuringBlack(){
-    bubbleCanvas.style.transition = "opacity 800ms ease";
-    bubbleCanvas.style.opacity = "0";
-    bubbleCanvas.style.pointerEvents = "none";
-
-    // 黒が消えた後にふわっと出す（不要ならこの2行を消してもOK）
-    setTimeout(() => {
-      bubbleCanvas.style.opacity = "1";
-    }, FADE_END_MS);
-  }
-
-  // homeが表示された瞬間に適用
-  const mo = new MutationObserver(() => {
-    if (!homeScreen.classList.contains("hidden")) hideBubblesDuringBlack();
-  });
-  mo.observe(homeScreen, { attributes: true, attributeFilter: ["class"] });
-
-  // すでにhome表示中でも適用
-  if (!homeScreen.classList.contains("hidden")) hideBubblesDuringBlack();
-})();
-</script>
-  <script>
-(() => {
-  const $ = (s) => document.querySelector(s);
-
-  // ====== ① 「参加中」をクリックで待機へ ======
-  const appRoot = $("#app");
-  const homeJoinBtn = $("#homeJoinBtn");
-  const bubbleCanvas = $("#bubbleCanvas");
-  const creditBtn = $("#creditBtn");
-
-  const loaderScreen  = $("#loaderScreen");
-  const homeScreen    = $("#homeScreen");
-  const detailsScreen = $("#detailsScreen");
-  const joinScreen    = $("#joinScreen");
-  const waitScreen    = $("#waitScreen");
-
-  function gotoWaitScreen(){
-    // 既存の showScreen("wait") 相当を“外から”再現（安全にDOMだけ）
-    if (loaderScreen)  loaderScreen.classList.add("hidden");
-    if (homeScreen)    homeScreen.classList.add("hidden");
-    if (detailsScreen) detailsScreen.classList.add("hidden");
-    if (joinScreen)    joinScreen.classList.add("hidden");
-    if (waitScreen)    waitScreen.classList.remove("hidden");
-
-    // Home以外はぼかしON
-    if (appRoot) appRoot.classList.add("frost-on");
-
-    // 泡キャンバスはHome専用（待機では隠す）
-    if (bubbleCanvas) bubbleCanvas.classList.add("hidden");
-
-    // クレジットは表示（loader以外）
-    if (creditBtn) creditBtn.classList.remove("hidden");
-
-    document.body.style.overflow = "hidden";
-  }
-
-  function enableJoinBtnAsGotoWait(){
-    if (!homeJoinBtn) return;
-
-    // 「参加中」のときだけ “押せる” にする
-    const isJoining = (homeJoinBtn.textContent || "").includes("参加中");
-    if (!isJoining) return;
-
-    // disabledを解除して、クリックを待機へ
-    homeJoinBtn.disabled = false;
-    homeJoinBtn.style.cursor = "pointer";
-    homeJoinBtn.title = "待機画面を開く";
-
-    // 二重登録防止
-    if (homeJoinBtn.dataset.gotoWaitBound === "1") return;
-    homeJoinBtn.dataset.gotoWaitBound = "1";
-
-    homeJoinBtn.addEventListener("click", (e) => {
-      // 参加中なら待機へ
-      gotoWaitScreen();
-    });
-  }
-
-  // homeJoinBtnの状態変化を監視（参加→参加中に変わった瞬間にも対応）
-  if (homeJoinBtn) {
-    const moBtn = new MutationObserver(enableJoinBtnAsGotoWait);
-    moBtn.observe(homeJoinBtn, { attributes:true, attributeFilter:["disabled"], childList:true, subtree:true });
-    // 初回も試す
-    enableJoinBtnAsGotoWait();
-  }
-
-  // ====== ② 背景動画：PC mad.mp4 / スマホ mad1.mp4 ======
-  const bgVideo = $("#bgVideo");
-  const PC_SRC = "mad.mp4";
-  const MOB_SRC = "mad1.mp4";
-
-  function isMobile(){
-    // 画面幅 + ユーザー環境を軽く判定（どっちか当たればスマホ扱い）
-    return matchMedia("(max-width: 720px)").matches ||
-           (navigator.userAgent && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
-  }
-
-  async function swapBgVideoIfNeeded(){
-    if (!bgVideo) return;
-
-    const target = isMobile() ? MOB_SRC : PC_SRC;
-
-    // すでに同じなら何もしない
-    const current = (bgVideo.getAttribute("src") || bgVideo.src || "");
-    if (current.includes(target)) return;
-
-    // 再生位置をできるだけ維持
-    const t = bgVideo.currentTime || 0;
-    const wasPaused = bgVideo.paused;
-
-    try{
-      bgVideo.src = target;
-      bgVideo.load();
-
-      // metadata待ち（短め）
-      await new Promise((res) => {
-        const to = setTimeout(res, 400);
-        bgVideo.onloadedmetadata = () => { clearTimeout(to); res(); };
-      });
-
-      // 同じ時間に合わせる（できる範囲で）
-      try { bgVideo.currentTime = Math.min(t, (bgVideo.duration||t)); } catch(_){}
-
-      if (!wasPaused) {
-        bgVideo.play().catch(()=>{});
+      function init(){
+        buildMaps();
+        buildStampPalette();
+        bind();
+        setPanel('map');
+        setTool('gallery');
+        applyEditTransform();
       }
-    }catch(_){}
-  }
 
-  // 背景動画は「開始後」に既存moduleが src を入れるので、
-  // bgVideoのsrcが入ったタイミングを監視して差し替える
-  if (bgVideo) {
-    const moVid = new MutationObserver(() => swapBgVideoIfNeeded());
-    moVid.observe(bgVideo, { attributes:true, attributeFilter:["src"] });
-    // 念のため periodic でも1回だけ（開始直後のレース対策）
-    setTimeout(swapBgVideoIfNeeded, 1200);
-  }
-
-  // 端末回転/リサイズで切り替え（スマホ⇄PC幅のとき）
-  window.addEventListener("resize", () => {
-    // 負荷軽く：少し遅延
-    clearTimeout(window.__bgSwapTimer);
-    window.__bgSwapTimer = setTimeout(swapBgVideoIfNeeded, 180);
-  }, { passive:true });
-
-})();
-</script>
-
-<script>
-(() => {
-  const prev = document.getElementById("carPrev");
-  const next = document.getElementById("carNext");
-  const dots = document.getElementById("carDots");
-  if (!prev || !next) return;
-
-  // PCでボタンが効かない原因になりやすい「viewportのpointerdown」へイベントが流れないよう止める
-  const stop = (e) => {
-    e.stopPropagation();
-    // スワイプ判定用の pointer capture を奪われないように（保険）
-    try { e.target.releasePointerCapture?.(e.pointerId); } catch(_) {}
-  };
-
-  ["pointerdown","pointerup","pointermove","mousedown","mouseup","mousemove","touchstart","touchend"].forEach(type => {
-    prev.addEventListener(type, stop, { passive: true });
-    next.addEventListener(type, stop, { passive: true });
-  });
-
-  // dots も同様（PCでクリックが抜ける場合がある）
-  if (dots){
-    ["pointerdown","mousedown","touchstart"].forEach(type => {
-      dots.addEventListener(type, (e)=>e.stopPropagation(), { passive:true });
-    });
-  }
-
-  // 念のため：ボタンが上に来るように
-  const style = document.createElement("style");
-  style.textContent = `
-    .navBtn{ pointer-events:auto !important; z-index:9999 !important; }
-    .dots{ pointer-events:auto !important; z-index:9998 !important; }
-  `;
-  document.head.appendChild(style);
-})();
-</script>
-
-  
+      init();
+    })();
+  </script>
 </body>
 </html>
